@@ -41,11 +41,17 @@ CLAUDE_CONFIG = {
     ]
 }
 
-# Configuración de OpenAI (opcional)
+# Configuración de OpenAI
 OPENAI_CONFIG = {
-    "model": "gpt-4-turbo-preview",
-    "max_tokens": 4000,
-    "temperature": 0.3
+    "model": "gpt-4o",
+    "max_tokens": 16000,
+    "temperature": 0.3,
+    "models_available": [
+        "gpt-4o",
+        "gpt-4-turbo",
+        "gpt-4",
+        "gpt-3.5-turbo"
+    ]
 }
 
 # Configuración de Semrush
