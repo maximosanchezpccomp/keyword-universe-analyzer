@@ -23,21 +23,281 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS personalizado
+# CSS personalizado con branding PC Componentes
 st.markdown("""
 <style>
+    /* Colores corporativos PC Componentes */
+    :root {
+        --pc-orange: #FF6000;
+        --pc-orange-light: #FF8640;
+        --pc-orange-lighter: #FFD7BF;
+        --pc-blue-dark: #090029;
+        --pc-blue-medium: #170453;
+        --pc-blue-light: #51437E;
+        --pc-gray-dark: #999999;
+        --pc-gray-medium: #CCCCCC;
+        --pc-white: #FFFFFF;
+    }
+    
+    /* Header principal */
     .main-header {
-        font-size: 3rem;
-        font-weight: bold;
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        font-size: 2.5rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #FF6000 0%, #FF8640 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 0.5rem;
+        letter-spacing: -0.5px;
     }
-    .metric-card {
-        background: #f8f9fa;
+    
+    .main-subtitle {
+        color: #170453;
+        font-size: 1.1rem;
+        font-weight: 500;
+        margin-bottom: 2rem;
+        opacity: 0.9;
+    }
+    
+    /* Logo container */
+    .logo-container {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
         padding: 1rem;
-        border-radius: 0.5rem;
-        border-left: 4px solid #667eea;
+        background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
+        border-radius: 12px;
+        border-left: 4px solid #FF6000;
+    }
+    
+    /* Botones primarios */
+    .stButton > button {
+        background: linear-gradient(135deg, #FF6000 0%, #FF8640 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.6rem 1.5rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(255, 96, 0, 0.3);
+    }
+    
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #FF8640 0%, #FF6000 100%);
+        box-shadow: 0 4px 12px rgba(255, 96, 0, 0.4);
+        transform: translateY(-1px);
+    }
+    
+    /* Tarjetas de métricas */
+    .metric-card {
+        background: linear-gradient(135deg, #FFFFFF 0%, #F9F9F9 100%);
+        padding: 1.2rem;
+        border-radius: 12px;
+        border-left: 4px solid #FF6000;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .metric-card:hover {
+        box-shadow: 0 4px 16px rgba(255, 96, 0, 0.15);
+        transform: translateY(-2px);
+    }
+    
+    /* Sidebar personalizada */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #170453 0%, #090029 100%);
+    }
+    
+    [data-testid="stSidebar"] * {
+        color: #FFFFFF !important;
+    }
+    
+    [data-testid="stSidebar"] .stSelectbox label,
+    [data-testid="stSidebar"] .stTextInput label,
+    [data-testid="stSidebar"] .stSlider label {
+        color: #FFD7BF !important;
+        font-weight: 600;
+    }
+    
+    /* Expanders en sidebar */
+    [data-testid="stSidebar"] .streamlit-expanderHeader {
+        background-color: rgba(255, 96, 0, 0.1);
+        border-radius: 8px;
+        color: #FFFFFF !important;
+        font-weight: 600;
+    }
+    
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: #F5F5F5;
+        padding: 0.5rem;
+        border-radius: 10px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 8px;
+        padding: 0.5rem 1.5rem;
+        background-color: transparent;
+        color: #170453;
+        font-weight: 600;
+        border: 2px solid transparent;
+        transition: all 0.3s ease;
+    }
+    
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: #FFD7BF;
+        color: #FF6000;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #FF6000 0%, #FF8640 100%);
+        color: white !important;
+        border-color: #FF6000;
+    }
+    
+    /* Info boxes */
+    .stAlert {
+        border-radius: 10px;
+        border-left-width: 4px;
+    }
+    
+    /* Success */
+    [data-baseweb="notification"][kind="success"] {
+        background-color: #E8F5E9;
+        border-left-color: #4CAF50;
+    }
+    
+    /* Info */
+    [data-baseweb="notification"][kind="info"] {
+        background-color: #FFD7BF;
+        border-left-color: #FF6000;
+    }
+    
+    /* Warning */
+    [data-baseweb="notification"][kind="warning"] {
+        background-color: #FFF3E0;
+        border-left-color: #FF6000;
+    }
+    
+    /* Dataframes */
+    .stDataFrame {
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Headers de secciones */
+    h1, h2, h3 {
+        color: #090029;
+        font-weight: 700;
+    }
+    
+    h2 {
+        border-bottom: 3px solid #FF6000;
+        padding-bottom: 0.5rem;
+        margin-top: 2rem;
+    }
+    
+    /* Dividers */
+    hr {
+        border-color: #FF8640;
+        margin: 2rem 0;
+    }
+    
+    /* Select boxes y inputs */
+    .stSelectbox > div > div {
+        border-color: #CCCCCC;
+        border-radius: 8px;
+    }
+    
+    .stSelectbox > div > div:focus-within {
+        border-color: #FF6000;
+        box-shadow: 0 0 0 2px rgba(255, 96, 0, 0.1);
+    }
+    
+    /* File uploader */
+    [data-testid="stFileUploader"] {
+        border: 2px dashed #FF8640;
+        border-radius: 10px;
+        padding: 2rem;
+        background: linear-gradient(135deg, #FFFFFF 0%, #FFF9F5 100%);
+    }
+    
+    [data-testid="stFileUploader"]:hover {
+        border-color: #FF6000;
+        background: #FFF9F5;
+    }
+    
+    /* Spinner personalizado */
+    .stSpinner > div {
+        border-top-color: #FF6000 !important;
+    }
+    
+    /* Badges/Pills */
+    .badge-tier-1 {
+        background: linear-gradient(135deg, #FF6000 0%, #FF8640 100%);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: inline-block;
+    }
+    
+    .badge-tier-2 {
+        background: linear-gradient(135deg, #170453 0%, #51437E 100%);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: inline-block;
+    }
+    
+    .badge-tier-3 {
+        background: linear-gradient(135deg, #8B81A9 0%, #C5C0D4 100%);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: inline-block;
+    }
+    
+    /* Links */
+    a {
+        color: #FF6000 !important;
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+    
+    a:hover {
+        color: #FF8640 !important;
+        text-decoration: underline;
+    }
+    
+    /* Footer */
+    .footer {
+        text-align: center;
+        padding: 2rem;
+        margin-top: 3rem;
+        border-top: 2px solid #F5F5F5;
+        color: #999999;
+        font-size: 0.9rem;
+    }
+    
+    /* Animaciones */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .fade-in {
+        animation: fadeIn 0.5s ease-out;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -51,9 +311,26 @@ if 'processed_data' not in st.session_state:
     st.session_state.processed_data = None
 
 def main():
-    # Header
-    st.markdown('<h1 class="main-header">🌌 Keyword Universe Analyzer</h1>', unsafe_allow_html=True)
-    st.markdown("### Crea tu universo de keywords con IA y datos competitivos")
+    # Header con logo
+    col_logo, col_title = st.columns([1, 4])
+    
+    with col_logo:
+        # Logo PC Componentes
+        # Asegúrate de guardar el logo en: assets/pc_logo.png
+        try:
+            st.image("assets/pc_logo.png", width=120)
+        except:
+            # Fallback si no encuentra el logo
+            st.markdown("""
+            <div style="background: linear-gradient(135deg, #FF6000 0%, #FF8640 100%); 
+                        padding: 1rem; border-radius: 10px; text-align: center;">
+                <span style="color: white; font-size: 1.5rem; font-weight: 800;">PC</span>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    with col_title:
+        st.markdown('<h1 class="main-header fade-in">🌌 Keyword Universe Analyzer</h1>', unsafe_allow_html=True)
+        st.markdown('<p class="main-subtitle fade-in">Análisis SEO con IA - Powered by PC Componentes</p>', unsafe_allow_html=True)
     
     # Sidebar
     with st.sidebar:
