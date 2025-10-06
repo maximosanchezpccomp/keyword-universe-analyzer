@@ -1,5 +1,5 @@
 """
-Keyword Universe Analyzer - Aplicación Principal
+Keyword Universe Analyzer - Powered by PC Componentes
 
 Este paquete contiene la aplicación de análisis de keywords con IA.
 """
@@ -10,8 +10,8 @@ from pathlib import Path
 
 # Versión del paquete
 __version__ = "1.0.0"
-__author__ = "Tu Nombre"
-__email__ = "tu-email@ejemplo.com"
+__author__ = "PC Componentes"
+__email__ = "info@pccomponentes.com"
 __license__ = "MIT"
 
 # Añadir el directorio raíz al path para imports
@@ -61,7 +61,7 @@ PACKAGE_INFO = {
     'author': __author__,
     'email': __email__,
     'license': __license__,
-    'url': 'https://github.com/tu-usuario/keyword-universe-analyzer',
+    'url': 'https://github.com/pccomponentes/keyword-universe-analyzer',
     'keywords': ['seo', 'keywords', 'ai', 'claude', 'anthropic', 'semrush', 'analysis'],
 }
 
