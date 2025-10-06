@@ -114,163 +114,160 @@ st.markdown("""
     }
     
     /* ============================================
-       SIDEBAR - OPTIMIZADO PARA USABILIDAD
+       SIDEBAR - CONFIGURACIÓN COMPLETA SIN BLANCOS
        ============================================ */
     
     /* Sidebar principal */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #170453 0%, #090029 100%);
+        background: linear-gradient(180deg, #170453 0%, #090029 100%) !important;
     }
     
-    /* Texto general - Color claro pero no blanco puro */
+    /* FORZAR: Eliminar TODOS los fondos blancos del sidebar */
+    [data-testid="stSidebar"],
+    [data-testid="stSidebar"] *,
+    [data-testid="stSidebar"] > div,
+    [data-testid="stSidebar"] section,
+    [data-testid="stSidebar"] [class*="css"] {
+        background-color: transparent !important;
+    }
+    
+    /* Texto general */
     [data-testid="stSidebar"] * {
         color: #E8E6F0 !important;
     }
     
-    /* Labels con mejor contraste */
-    [data-testid="stSidebar"] .stSelectbox label,
-    [data-testid="stSidebar"] .stTextInput label,
-    [data-testid="stSidebar"] .stSlider label,
-    [data-testid="stSidebar"] .stNumberInput label,
-    [data-testid="stSidebar"] .stRadio label {
+    /* Labels */
+    [data-testid="stSidebar"] label {
         color: #FFB380 !important;
-        font-weight: 600;
-        font-size: 0.95rem;
+        font-weight: 600 !important;
+        font-size: 0.95rem !important;
     }
     
-    /* Expanders con mejor visibilidad */
+    /* ========== EXPANDERS ========== */
     [data-testid="stSidebar"] .streamlit-expanderHeader {
         background-color: rgba(255, 96, 0, 0.25) !important;
-        border-radius: 8px;
+        border-radius: 8px !important;
         color: #FFFFFF !important;
-        font-weight: 600;
-        border: 1.5px solid rgba(255, 134, 64, 0.5);
-        padding: 0.75rem 1rem;
-        transition: all 0.2s ease;
+        font-weight: 600 !important;
+        border: 1.5px solid rgba(255, 134, 64, 0.5) !important;
+        padding: 0.75rem 1rem !important;
     }
     
     [data-testid="stSidebar"] .streamlit-expanderHeader:hover {
         background-color: rgba(255, 96, 0, 0.35) !important;
-        border-color: rgba(255, 134, 64, 0.7);
+        border-color: rgba(255, 134, 64, 0.7) !important;
     }
     
-    /* Contenido del expander - SIN fondo blanco */
     [data-testid="stSidebar"] .streamlit-expanderContent {
         background-color: transparent !important;
         border: none !important;
-        padding-top: 1rem;
     }
     
     [data-testid="stSidebar"] details {
         background-color: transparent !important;
-        margin-bottom: 1rem;
     }
     
-    /* Inputs - ELIMINADO fondo blanco, ahora azul oscuro sólido */
-    [data-testid="stSidebar"] input,
+    /* ========== TEXT INPUTS & TEXTAREAS ========== */
+    [data-testid="stSidebar"] input[type="text"],
+    [data-testid="stSidebar"] input[type="password"],
+    [data-testid="stSidebar"] input[type="number"],
     [data-testid="stSidebar"] textarea {
-        background-color: rgba(23, 4, 83, 0.6) !important;
-        border: 2px solid rgba(255, 134, 64, 0.4) !important;
-        color: #F5F5F5 !important;
-        border-radius: 6px;
-        padding: 0.6rem;
-        transition: all 0.2s ease;
+        background-color: #1F0A5C !important;
+        border: 2px solid #FF8640 !important;
+        color: #FFFFFF !important;
+        border-radius: 8px !important;
+        padding: 0.75rem !important;
     }
     
-    [data-testid="stSidebar"] input:hover,
-    [data-testid="stSidebar"] textarea:hover {
-        border-color: rgba(255, 134, 64, 0.6) !important;
-        background-color: rgba(23, 4, 83, 0.8) !important;
-    }
-    
-    /* Placeholders más legibles */
     [data-testid="stSidebar"] input::placeholder,
     [data-testid="stSidebar"] textarea::placeholder {
-        color: rgba(255, 179, 128, 0.6) !important;
-        font-style: italic;
+        color: #B8A0D4 !important;
+        opacity: 0.7 !important;
     }
     
-    /* Focus con mejor visibilidad */
     [data-testid="stSidebar"] input:focus,
     [data-testid="stSidebar"] textarea:focus {
-        border-color: #FF8640 !important;
-        box-shadow: 0 0 0 3px rgba(255, 134, 64, 0.25) !important;
-        background-color: rgba(23, 4, 83, 0.9) !important;
-        outline: none;
+        border-color: #FF6000 !important;
+        box-shadow: 0 0 0 3px rgba(255, 96, 0, 0.3) !important;
+        outline: none !important;
     }
     
-    /* Selectboxes - ELIMINADO fondo blanco completamente */
-    [data-testid="stSidebar"] select,
-    [data-testid="stSidebar"] [data-baseweb="select"] {
-        background-color: rgba(23, 4, 83, 0.6) !important;
-        border: 2px solid rgba(255, 134, 64, 0.4) !important;
-        color: #F5F5F5 !important;
-        border-radius: 6px;
+    /* ========== SELECTBOXES - ENFOQUE AGRESIVO ========== */
+    /* Contenedor principal del selectbox */
+    [data-testid="stSidebar"] .stSelectbox {
+        background-color: transparent !important;
     }
     
-    /* Todos los elementos internos del selectbox sin blanco */
-    [data-testid="stSidebar"] .stSelectbox,
+    /* TODOS los divs dentro del selectbox */
+    [data-testid="stSidebar"] .stSelectbox div,
     [data-testid="stSidebar"] .stSelectbox > div,
     [data-testid="stSidebar"] .stSelectbox > div > div,
-    [data-testid="stSidebar"] .stSelectbox [data-baseweb="select"],
-    [data-testid="stSidebar"] .stSelectbox input {
-        background-color: rgba(23, 4, 83, 0.6) !important;
-        border: 2px solid rgba(255, 134, 64, 0.4) !important;
-        color: #F5F5F5 !important;
-    }
-    
-    /* Texto dentro del selectbox */
-    [data-testid="stSidebar"] .stSelectbox span,
-    [data-testid="stSidebar"] .stSelectbox div {
-        color: #F5F5F5 !important;
-        background-color: transparent !important;
-    }
-    
-    /* Hover state */
-    [data-testid="stSidebar"] .stSelectbox > div > div:hover {
-        border-color: rgba(255, 134, 64, 0.6) !important;
-        background-color: rgba(23, 4, 83, 0.8) !important;
-    }
-    
-    /* El contenedor principal del select */
-    [data-testid="stSidebar"] [data-baseweb="select"] > div {
-        background-color: rgba(23, 4, 83, 0.6) !important;
-    }
-    
-    /* Dropdown menus con mejor contraste */
-    [data-testid="stSidebar"] [data-baseweb="popover"] {
+    [data-testid="stSidebar"] .stSelectbox > div > div > div {
         background-color: #1F0A5C !important;
-        border: 1.5px solid rgba(255, 134, 64, 0.4);
-        border-radius: 8px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        border: 2px solid #FF8640 !important;
+        border-radius: 8px !important;
     }
     
-    [data-testid="stSidebar"] [role="option"] {
-        background-color: transparent !important;
-        color: #E8E6F0 !important;
-        padding: 0.6rem 1rem;
-        transition: all 0.15s ease;
-    }
-    
-    /* Hover en opciones - SIN blanco, usando naranja */
-    [data-testid="stSidebar"] [role="option"]:hover {
-        background-color: rgba(255, 96, 0, 0.3) !important;
+    /* Componente base de Streamlit */
+    [data-testid="stSidebar"] [data-baseweb="select"],
+    [data-testid="stSidebar"] [data-baseweb="select"] > div,
+    [data-testid="stSidebar"] [data-baseweb="select"] * {
+        background-color: #1F0A5C !important;
         color: #FFFFFF !important;
     }
     
-    [data-testid="stSidebar"] [aria-selected="true"] {
+    /* Input interno del select */
+    [data-testid="stSidebar"] .stSelectbox input {
+        background-color: #1F0A5C !important;
+        color: #FFFFFF !important;
+        border: none !important;
+    }
+    
+    /* Texto mostrado en el select */
+    [data-testid="stSidebar"] .stSelectbox span {
+        color: #FFFFFF !important;
+    }
+    
+    /* Hover en el selectbox */
+    [data-testid="stSidebar"] .stSelectbox:hover div {
+        border-color: #FF6000 !important;
+    }
+    
+    /* ========== DROPDOWN MENU (cuando se abre el select) ========== */
+    [data-testid="stSidebar"] [data-baseweb="popover"],
+    [data-testid="stSidebar"] [data-baseweb="popover"] > div,
+    [data-testid="stSidebar"] [role="listbox"] {
+        background-color: #1F0A5C !important;
+        border: 2px solid #FF8640 !important;
+        border-radius: 8px !important;
+    }
+    
+    /* Opciones del dropdown */
+    [data-testid="stSidebar"] [role="option"],
+    [data-testid="stSidebar"] [role="option"] > div {
+        background-color: transparent !important;
+        color: #E8E6F0 !important;
+        padding: 0.75rem 1rem !important;
+    }
+    
+    /* Hover en opciones */
+    [data-testid="stSidebar"] [role="option"]:hover,
+    [data-testid="stSidebar"] [role="option"]:hover > div {
         background-color: rgba(255, 96, 0, 0.4) !important;
         color: #FFFFFF !important;
-        font-weight: 600;
     }
     
-    /* Radio buttons */
+    /* Opción seleccionada */
+    [data-testid="stSidebar"] [aria-selected="true"],
+    [data-testid="stSidebar"] [aria-selected="true"] > div {
+        background-color: rgba(255, 96, 0, 0.5) !important;
+        color: #FFFFFF !important;
+        font-weight: 600 !important;
+    }
+    
+    /* ========== RADIO BUTTONS ========== */
     [data-testid="stSidebar"] .stRadio > div {
         background-color: transparent !important;
-    }
-    
-    [data-testid="stSidebar"] .stRadio label {
-        color: #E8E6F0 !important;
     }
     
     [data-testid="stSidebar"] input[type="radio"]:checked + div {
@@ -278,71 +275,71 @@ st.markdown("""
         border-color: #FF6000 !important;
     }
     
-    /* Sliders */
+    /* ========== SLIDERS ========== */
     [data-testid="stSidebar"] .stSlider {
-        padding: 1rem 0;
+        padding: 1rem 0 !important;
     }
     
     [data-testid="stSidebar"] .stSlider [role="slider"] {
         background-color: #FF6000 !important;
     }
     
-    /* Number Input */
+    /* ========== NUMBER INPUT ========== */
     [data-testid="stSidebar"] .stNumberInput input {
-        background-color: rgba(23, 4, 83, 0.6) !important;
-        border: 2px solid rgba(255, 134, 64, 0.4) !important;
-        color: #F5F5F5 !important;
+        background-color: #1F0A5C !important;
+        border: 2px solid #FF8640 !important;
+        color: #FFFFFF !important;
+        border-radius: 8px !important;
     }
     
     [data-testid="stSidebar"] .stNumberInput button {
-        background-color: rgba(255, 96, 0, 0.2) !important;
+        background-color: rgba(255, 96, 0, 0.3) !important;
         color: #FFB380 !important;
-        border: 1px solid rgba(255, 134, 64, 0.3) !important;
+        border: 1px solid #FF8640 !important;
     }
     
     [data-testid="stSidebar"] .stNumberInput button:hover {
-        background-color: rgba(255, 96, 0, 0.4) !important;
+        background-color: rgba(255, 96, 0, 0.5) !important;
         color: #FFFFFF !important;
     }
     
-    /* Info boxes con mejor visibilidad */
+    /* ========== TEXT AREAS ========== */
+    [data-testid="stSidebar"] .stTextArea textarea {
+        background-color: #1F0A5C !important;
+        border: 2px solid #FF8640 !important;
+        color: #FFFFFF !important;
+        border-radius: 8px !important;
+    }
+    
+    /* ========== INFO BOXES ========== */
     [data-testid="stSidebar"] .stAlert {
         background-color: rgba(255, 96, 0, 0.2) !important;
         border-left: 4px solid #FF8640 !important;
-        border-radius: 8px;
         color: #F5F5F5 !important;
-        padding: 1rem;
     }
     
     [data-testid="stSidebar"] .stAlert * {
         color: #F5F5F5 !important;
     }
     
-    [data-testid="stSidebar"] .stAlert svg {
-        fill: #FFB380 !important;
-    }
-    
-    /* Dividers */
+    /* ========== DIVIDERS ========== */
     [data-testid="stSidebar"] hr {
-        border-color: rgba(255, 134, 64, 0.3) !important;
-        margin: 1.5rem 0;
-        border-width: 1px;
+        border-color: rgba(255, 134, 64, 0.4) !important;
+        margin: 1.5rem 0 !important;
     }
     
-    /* Headers en sidebar */
+    /* ========== HEADERS ========== */
     [data-testid="stSidebar"] h1,
     [data-testid="stSidebar"] h2,
     [data-testid="stSidebar"] h3 {
         color: #FFFFFF !important;
-        font-weight: 700;
-        margin-top: 1rem;
-        margin-bottom: 0.5rem;
+        font-weight: 700 !important;
     }
     
-    /* Accesibilidad - Focus visible */
+    /* ========== ACCESIBILIDAD ========== */
     [data-testid="stSidebar"] *:focus-visible {
-        outline: 2px solid #FF8640 !important;
-        outline-offset: 2px;
+        outline: 2px solid #FF6000 !important;
+        outline-offset: 2px !important;
     }
     
     /* ============================================
