@@ -72,14 +72,27 @@ ANALYSIS_CONFIG = {
     "cache_ttl": int(os.getenv("CACHE_TTL", 3600))
 }
 
-# Configuración de visualización
+# Configuración de visualización - Colores corporativos PC Componentes
 VIZ_CONFIG = {
     "color_scheme": {
-        1: "#667eea",  # Púrpura
-        2: "#764ba2",  # Morado
-        3: "#f093fb",  # Rosa
-        4: "#4facfe",  # Azul
-        5: "#43e97b"   # Verde
+        1: "#FF6000",  # Naranja principal - Tier 1
+        2: "#170453",  # Azul medio - Tier 2
+        3: "#51437E",  # Azul medio claro - Tier 3
+        4: "#8B81A9",  # Azul claro - Tier 4
+        5: "#C5C0D4"   # Azul muy claro - Tier 5
+    },
+    "pc_colors": {
+        "orange": "#FF6000",
+        "orange_light": "#FF8640",
+        "orange_lighter": "#FFD7BF",
+        "blue_dark": "#090029",
+        "blue_medium": "#170453",
+        "blue_light": "#51437E",
+        "blue_lighter": "#8B81A9",
+        "blue_lightest": "#C5C0D4",
+        "gray_dark": "#999999",
+        "gray_medium": "#CCCCCC",
+        "white": "#FFFFFF"
     },
     "default_chart_height": 600,
     "bubble_size_multiplier": 0.5
