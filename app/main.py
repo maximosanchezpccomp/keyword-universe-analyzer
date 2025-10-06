@@ -310,23 +310,61 @@ if 'uploaded_files' not in st.session_state:
 if 'processed_data' not in st.session_state:
     st.session_state.processed_data = None
 
+def display_logo():
+    """
+    Muestra el logo con sistema de fallback en cascada
+    Prioridad: URL > Base64 > Archivo local > Placeholder
+    """
+    from config import LOGO_URL, LOGO_BASE64
+    
+    # Prioridad 1: Logo desde URL externa
+    if LOGO_URL:
+        try:
+            st.image(LOGO_URL, width=120)
+            return True
+        except Exception as e:
+            st.warning(f"⚠️ Error cargando logo desde URL: {str(e)}")
+            # Continuar al siguiente método
+    
+    # Prioridad 2: Logo en Base64 embebido
+    if LOGO_BASE64:
+        try:
+            st.markdown(
+                f'<img src="{LOGO_BASE64}" width="120" style="border-radius: 8px;">',
+                unsafe_allow_html=True
+            )
+            return True
+        except Exception as e:
+            st.warning(f"⚠️ Error cargando logo Base64: {str(e)}")
+            # Continuar al siguiente método
+    
+    # Prioridad 3: Logo local en assets/
+    if os.path.exists("assets/pc_logo.png"):
+        try:
+            st.image("assets/pc_logo.png", width=120)
+            return True
+        except Exception as e:
+            st.warning(f"⚠️ Error cargando logo local: {str(e)}")
+            # Continuar al fallback
+    
+    # Prioridad 4: Fallback - Placeholder con iniciales
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #FF6000 0%, #FF8640 100%); 
+                padding: 1rem; border-radius: 10px; text-align: center;
+                width: 120px; box-shadow: 0 2px 8px rgba(255, 96, 0, 0.3);">
+        <span style="color: white; font-size: 1.5rem; font-weight: 800; 
+                     letter-spacing: 2px;">PC</span>
+    </div>
+    """, unsafe_allow_html=True)
+    return False
+
+
 def main():
     # Header con logo
     col_logo, col_title = st.columns([1, 4])
     
     with col_logo:
-        # Logo PC Componentes
-        # Asegúrate de guardar el logo en: assets/pc_logo.png
-        try:
-            st.image("assets/pc_logo.png", width=120)
-        except:
-            # Fallback si no encuentra el logo
-            st.markdown("""
-            <div style="background: linear-gradient(135deg, #FF6000 0%, #FF8640 100%); 
-                        padding: 1rem; border-radius: 10px; text-align: center;">
-                <span style="color: white; font-size: 1.5rem; font-weight: 800;">PC</span>
-            </div>
-            """, unsafe_allow_html=True)
+        display_logo()
     
     with col_title:
         st.markdown('<h1 class="main-header fade-in">🌌 Keyword Universe Analyzer</h1>', unsafe_allow_html=True)
