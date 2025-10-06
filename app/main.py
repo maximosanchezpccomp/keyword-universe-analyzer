@@ -240,26 +240,53 @@ st.markdown("""
         background-color: #1F0A5C !important;
         border: 2px solid #FF8640 !important;
         border-radius: 8px !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+    
+    /* Contenedor interno del listbox */
+    [data-testid="stSidebar"] [role="listbox"] > div {
+        background-color: #1F0A5C !important;
+        max-height: none !important;
+        overflow-y: auto !important;
     }
     
     /* Opciones del dropdown */
     [data-testid="stSidebar"] [role="option"],
-    [data-testid="stSidebar"] [role="option"] > div {
+    [data-testid="stSidebar"] [role="option"] > div,
+    [data-testid="stSidebar"] [role="option"] * {
         background-color: transparent !important;
         color: #E8E6F0 !important;
         padding: 0.75rem 1rem !important;
+        line-height: 1.5 !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        overflow: visible !important;
+        min-height: auto !important;
+        height: auto !important;
+    }
+    
+    /* Asegurar que el texto se vea completo */
+    [data-testid="stSidebar"] [role="option"] span,
+    [data-testid="stSidebar"] [role="option"] div {
+        display: block !important;
+        width: 100% !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
     }
     
     /* Hover en opciones */
     [data-testid="stSidebar"] [role="option"]:hover,
-    [data-testid="stSidebar"] [role="option"]:hover > div {
+    [data-testid="stSidebar"] [role="option"]:hover > div,
+    [data-testid="stSidebar"] [role="option"]:hover * {
         background-color: rgba(255, 96, 0, 0.4) !important;
         color: #FFFFFF !important;
     }
     
     /* Opción seleccionada */
     [data-testid="stSidebar"] [aria-selected="true"],
-    [data-testid="stSidebar"] [aria-selected="true"] > div {
+    [data-testid="stSidebar"] [aria-selected="true"] > div,
+    [data-testid="stSidebar"] [aria-selected="true"] * {
         background-color: rgba(255, 96, 0, 0.5) !important;
         color: #FFFFFF !important;
         font-weight: 600 !important;
