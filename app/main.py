@@ -173,7 +173,7 @@ st.markdown("""
     [data-testid="stSidebar"] input[type="number"],
     [data-testid="stSidebar"] textarea {
         background-color: #1F0A5C !important;
-        border: 1px solid rgba(255, 134, 64, 0.3) !important;
+        border: 1px solid rgba(81, 67, 126, 0.4) !important;
         color: #FFFFFF !important;
         border-radius: 6px !important;
         padding: 0.65rem !important;
@@ -187,13 +187,14 @@ st.markdown("""
     
     [data-testid="stSidebar"] input:hover,
     [data-testid="stSidebar"] textarea:hover {
-        border-color: rgba(255, 134, 64, 0.5) !important;
+        border-color: rgba(81, 67, 126, 0.6) !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
     }
     
     [data-testid="stSidebar"] input:focus,
     [data-testid="stSidebar"] textarea:focus {
-        border-color: #FF8640 !important;
-        box-shadow: 0 0 0 2px rgba(255, 134, 64, 0.2) !important;
+        border-color: rgba(81, 67, 126, 0.8) !important;
+        box-shadow: 0 0 0 2px rgba(81, 67, 126, 0.3) !important;
         outline: none !important;
     }
     
@@ -203,10 +204,10 @@ st.markdown("""
         background-color: transparent !important;
     }
     
-    /* TODOS los divs - SIN bordes naranjas excesivos */
+    /* TODOS los divs - SIN bordes naranjas */
     [data-testid="stSidebar"] .stSelectbox div {
         background-color: #1F0A5C !important;
-        border: 1px solid rgba(255, 134, 64, 0.3) !important;
+        border: 1px solid rgba(81, 67, 126, 0.4) !important;
         border-radius: 6px !important;
     }
     
@@ -219,12 +220,13 @@ st.markdown("""
     /* Solo el contenedor principal tiene borde */
     [data-testid="stSidebar"] .stSelectbox > div > div {
         background-color: #1F0A5C !important;
-        border: 1px solid rgba(255, 134, 64, 0.3) !important;
+        border: 1px solid rgba(81, 67, 126, 0.4) !important;
         border-radius: 6px !important;
     }
     
     [data-testid="stSidebar"] .stSelectbox > div > div:hover {
-        border-color: rgba(255, 134, 64, 0.5) !important;
+        border-color: rgba(81, 67, 126, 0.6) !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
     }
     
     /* Componente base */
@@ -254,10 +256,11 @@ st.markdown("""
     [data-testid="stSidebar"] [data-baseweb="popover"] > div,
     [data-testid="stSidebar"] [role="listbox"] {
         background-color: #1F0A5C !important;
-        border: 1px solid rgba(255, 134, 64, 0.4) !important;
+        border: 1px solid rgba(81, 67, 126, 0.5) !important;
         border-radius: 6px !important;
         max-height: 300px !important;
         overflow-y: auto !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
     }
     
     /* Contenedor interno */
