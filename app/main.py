@@ -20,7 +20,7 @@ from app.utils.helpers import export_to_excel, calculate_metrics
 try:
     from config import LOGO_URL, LOGO_BASE64
 except ImportError:
-    LOGO_URL = None
+    LOGO_URL = https://cdn.pccomponentes.com/img/logos/logo-pccomponentes.svg
     LOGO_BASE64 = None
 
 # Configuración de la página
