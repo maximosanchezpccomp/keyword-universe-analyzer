@@ -59,10 +59,27 @@ def main():
     with st.sidebar:
         st.header("⚙️ Configuración")
         
+        # Selección de proveedor de IA
+        with st.expander("🤖 Proveedor de IA", expanded=True):
+            ai_provider = st.selectbox(
+                "Selecciona el proveedor de IA",
+                ["Claude (Anthropic)", "OpenAI", "Ambos (Validación Cruzada)"],
+                help="Claude Sonnet 4.5 es más analítico. GPT-4 es más rápido."
+            )
+        
         # API Keys
         with st.expander("🔑 API Keys", expanded=True):
-            anthropic_key = st.text_input("Anthropic API Key", type="password", 
-                                         help="Tu API key de Claude")
+            anthropic_key = None
+            openai_key = None
+            
+            if ai_provider in ["Claude (Anthropic)", "Ambos (Validación Cruzada)"]:
+                anthropic_key = st.text_input("Anthropic API Key", type="password", 
+                                             help="Tu API key de Claude")
+            
+            if ai_provider in ["OpenAI", "Ambos (Validación Cruzada)"]:
+                openai_key = st.text_input("OpenAI API Key", type="password",
+                                          help="Tu API key de OpenAI")
+            
             semrush_key = st.text_input("Semrush API Key", type="password",
                                        help="Tu API key de Semrush (opcional)")
         
@@ -72,9 +89,28 @@ def main():
                                     100, 5000, 1000, 100)
             min_volume = st.number_input("Volumen mínimo de búsqueda", 
                                         min_value=0, value=10)
-            model_choice = st.selectbox("Modelo Claude", 
-                                       ["claude-sonnet-4-5-20250929", 
-                                        "claude-opus-4-20250514"])
+            
+            # Selección de modelo según proveedor
+            if ai_provider == "Claude (Anthropic)":
+                model_choice = st.selectbox("Modelo Claude", 
+                                           ["claude-sonnet-4-5-20250929", 
+                                            "claude-opus-4-20250514"])
+            elif ai_provider == "OpenAI":
+                model_choice = st.selectbox("Modelo OpenAI",
+                                           ["gpt-4o",
+                                            "gpt-4-turbo",
+                                            "gpt-4",
+                                            "gpt-3.5-turbo"])
+            else:  # Ambos
+                col1, col2 = st.columns(2)
+                with col1:
+                    claude_model = st.selectbox("Modelo Claude", 
+                                               ["claude-sonnet-4-5-20250929", 
+                                                "claude-opus-4-20250514"])
+                with col2:
+                    openai_model = st.selectbox("Modelo OpenAI",
+                                               ["gpt-4o",
+                                                "gpt-4-turbo"])
         
         st.divider()
         
@@ -161,10 +197,17 @@ def main():
     
     # TAB 2: Análisis con IA
     with tab2:
-        st.header("Análisis con Claude")
+        st.header("Análisis con IA")
         
-        if not anthropic_key:
+        # Validar API keys según proveedor
+        if ai_provider == "Claude (Anthropic)" and not anthropic_key:
             st.warning("⚠️ Por favor ingresa tu API key de Anthropic en la barra lateral")
+            return
+        elif ai_provider == "OpenAI" and not openai_key:
+            st.warning("⚠️ Por favor ingresa tu API key de OpenAI en la barra lateral")
+            return
+        elif ai_provider == "Ambos (Validación Cruzada)" and (not anthropic_key or not openai_key):
+            st.warning("⚠️ Para validación cruzada necesitas ambas API keys")
             return
         
         if not st.session_state.uploaded_files and st.session_state.processed_data is None:
@@ -222,24 +265,100 @@ def main():
                 include_gaps = st.checkbox("Detectar gaps de contenido", value=True)
             
             # Botón de análisis
-            if st.button("🚀 Analizar con Claude", type="primary", use_container_width=True):
-                with st.spinner("🧠 Claude está analizando tu universo de keywords..."):
+            if st.button("🚀 Analizar con IA", type="primary", use_container_width=True):
+                with st.spinner(f"🧠 {ai_provider.split('(')[0].strip()} está analizando tu universo de keywords..."):
                     try:
-                        anthropic_service = AnthropicService(anthropic_key, model_choice)
-                        
-                        # Crear el prompt
-                        prompt = anthropic_service.create_universe_prompt(
-                            df,
-                            analysis_type=analysis_type,
-                            num_tiers=num_tiers,
-                            custom_instructions=custom_instructions,
-                            include_semantic=include_semantic,
-                            include_trends=include_trends,
-                            include_gaps=include_gaps
-                        )
-                        
-                        # Llamar a Claude
-                        result = anthropic_service.analyze_keywords(prompt, df)
+                        if ai_provider == "Claude (Anthropic)":
+                            # Análisis con Claude
+                            anthropic_service = AnthropicService(anthropic_key, model_choice)
+                            
+                            prompt = anthropic_service.create_universe_prompt(
+                                df,
+                                analysis_type=analysis_type,
+                                num_tiers=num_tiers,
+                                custom_instructions=custom_instructions,
+                                include_semantic=include_semantic,
+                                include_trends=include_trends,
+                                include_gaps=include_gaps
+                            )
+                            
+                            result = anthropic_service.analyze_keywords(prompt, df)
+                            result['provider'] = 'Claude'
+                            result['model'] = model_choice
+                            
+                        elif ai_provider == "OpenAI":
+                            # Análisis con OpenAI
+                            from app.services.openai_service import OpenAIService
+                            
+                            openai_service = OpenAIService(openai_key, model_choice)
+                            
+                            messages = openai_service.create_universe_prompt(
+                                df,
+                                analysis_type=analysis_type,
+                                num_tiers=num_tiers,
+                                custom_instructions=custom_instructions,
+                                include_semantic=include_semantic,
+                                include_trends=include_trends,
+                                include_gaps=include_gaps
+                            )
+                            
+                            result = openai_service.analyze_keywords(messages, df)
+                            result['provider'] = 'OpenAI'
+                            result['model'] = model_choice
+                            
+                        else:  # Ambos (Validación Cruzada)
+                            from app.services.openai_service import OpenAIService
+                            
+                            # Análisis con Claude
+                            st.info("1️⃣ Analizando con Claude...")
+                            anthropic_service = AnthropicService(anthropic_key, claude_model)
+                            
+                            prompt_claude = anthropic_service.create_universe_prompt(
+                                df,
+                                analysis_type=analysis_type,
+                                num_tiers=num_tiers,
+                                custom_instructions=custom_instructions,
+                                include_semantic=include_semantic,
+                                include_trends=include_trends,
+                                include_gaps=include_gaps
+                            )
+                            
+                            result_claude = anthropic_service.analyze_keywords(prompt_claude, df)
+                            
+                            # Análisis con OpenAI
+                            st.info("2️⃣ Analizando con OpenAI...")
+                            openai_service = OpenAIService(openai_key, openai_model)
+                            
+                            messages_openai = openai_service.create_universe_prompt(
+                                df,
+                                analysis_type=analysis_type,
+                                num_tiers=num_tiers,
+                                custom_instructions=custom_instructions,
+                                include_semantic=include_semantic,
+                                include_trends=include_trends,
+                                include_gaps=include_gaps
+                            )
+                            
+                            result_openai = openai_service.analyze_keywords(messages_openai, df)
+                            
+                            # Validación cruzada
+                            st.info("3️⃣ Comparando resultados...")
+                            comparison = openai_service.compare_with_claude(result_claude, df)
+                            
+                            # Combinar resultados
+                            result = {
+                                'summary': f"**Análisis de Claude:**\n{result_claude.get('summary', '')}\n\n**Análisis de OpenAI:**\n{result_openai.get('summary', '')}",
+                                'topics': result_claude.get('topics', []),
+                                'topics_openai': result_openai.get('topics', []),
+                                'comparison': comparison,
+                                'provider': 'Ambos',
+                                'models': f"Claude: {claude_model} | OpenAI: {openai_model}"
+                            }
+                            
+                            if 'gaps' in result_claude:
+                                result['gaps'] = result_claude['gaps']
+                            if 'trends' in result_claude:
+                                result['trends'] = result_claude['trends']
                         
                         st.session_state.keyword_universe = result
                         
@@ -248,6 +367,9 @@ def main():
                         
                     except Exception as e:
                         st.error(f"❌ Error en el análisis: {str(e)}")
+                        import traceback
+                        with st.expander("Ver detalles del error"):
+                            st.code(traceback.format_exc())
             
             # Mostrar resultados si existen
             if st.session_state.keyword_universe:
@@ -256,13 +378,40 @@ def main():
                 
                 result = st.session_state.keyword_universe
                 
+                # Mostrar info del proveedor
+                provider_col1, provider_col2 = st.columns(2)
+                with provider_col1:
+                    st.metric("Proveedor de IA", result.get('provider', 'N/A'))
+                with provider_col2:
+                    if result.get('provider') == 'Ambos':
+                        st.metric("Modelos", result.get('models', 'N/A'))
+                    else:
+                        st.metric("Modelo", result.get('model', 'N/A'))
+                
                 # Resumen ejecutivo
                 with st.expander("📊 Resumen Ejecutivo", expanded=True):
                     st.markdown(result.get('summary', 'No disponible'))
                 
+                # Si es validación cruzada, mostrar comparación
+                if result.get('provider') == 'Ambos' and 'comparison' in result:
+                    with st.expander("🔄 Validación Cruzada", expanded=True):
+                        comp = result['comparison']
+                        st.markdown("**Validación General:**")
+                        st.info(comp.get('validation', 'N/A'))
+                        
+                        if 'missing_topics' in comp and comp['missing_topics']:
+                            st.markdown("**Topics Adicionales Sugeridos por OpenAI:**")
+                            for topic in comp['missing_topics']:
+                                st.markdown(f"- {topic}")
+                        
+                        if 'improvements' in comp and comp['improvements']:
+                            st.markdown("**Mejoras Sugeridas:**")
+                            for improvement in comp['improvements']:
+                                st.markdown(f"- {improvement}")
+                
                 # Topics por tier
                 if 'topics' in result:
-                    st.subheader("🎯 Topics Identificados")
+                    st.subheader("🎯 Topics Identificados (Claude)" if result.get('provider') == 'Ambos' else "🎯 Topics Identificados")
                     
                     topics_df = pd.DataFrame(result['topics'])
                     
@@ -283,6 +432,12 @@ def main():
                     )
                     
                     st.dataframe(filtered_topics, use_container_width=True, height=400)
+                
+                # Si hay análisis de OpenAI también, mostrarlo
+                if result.get('provider') == 'Ambos' and 'topics_openai' in result:
+                    st.subheader("🎯 Topics Identificados (OpenAI)")
+                    topics_openai_df = pd.DataFrame(result['topics_openai'])
+                    st.dataframe(topics_openai_df, use_container_width=True, height=400)
     
     # TAB 3: Visualización
     with tab3:
