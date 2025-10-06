@@ -4,6 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 import sys
+import os
 from pathlib import Path
 
 # Añadir el directorio raíz al path
@@ -14,6 +15,13 @@ from app.services.semrush_service import SemrushService
 from app.components.data_processor import DataProcessor
 from app.components.visualizer import KeywordVisualizer
 from app.utils.helpers import export_to_excel, calculate_metrics
+
+# Importar configuración del logo
+try:
+    from config import LOGO_URL, LOGO_BASE64
+except ImportError:
+    LOGO_URL = None
+    LOGO_BASE64 = None
 
 # Configuración de la página
 st.set_page_config(
@@ -315,16 +323,14 @@ def display_logo():
     Muestra el logo con sistema de fallback en cascada
     Prioridad: URL > Base64 > Archivo local > Placeholder
     """
-    from config import LOGO_URL, LOGO_BASE64
-    
     # Prioridad 1: Logo desde URL externa
     if LOGO_URL:
         try:
             st.image(LOGO_URL, width=120)
             return True
         except Exception as e:
-            st.warning(f"⚠️ Error cargando logo desde URL: {str(e)}")
-            # Continuar al siguiente método
+            # Silencioso - continuar al siguiente método
+            pass
     
     # Prioridad 2: Logo en Base64 embebido
     if LOGO_BASE64:
@@ -335,8 +341,8 @@ def display_logo():
             )
             return True
         except Exception as e:
-            st.warning(f"⚠️ Error cargando logo Base64: {str(e)}")
-            # Continuar al siguiente método
+            # Silencioso - continuar al siguiente método
+            pass
     
     # Prioridad 3: Logo local en assets/
     if os.path.exists("assets/pc_logo.png"):
@@ -344,10 +350,10 @@ def display_logo():
             st.image("assets/pc_logo.png", width=120)
             return True
         except Exception as e:
-            st.warning(f"⚠️ Error cargando logo local: {str(e)}")
-            # Continuar al fallback
+            # Silencioso - continuar al fallback
+            pass
     
-    # Prioridad 4: Fallback - Placeholder con iniciales
+    # Prioridad 4: Fallback - Placeholder con iniciales PC
     st.markdown("""
     <div style="background: linear-gradient(135deg, #FF6000 0%, #FF8640 100%); 
                 padding: 1rem; border-radius: 10px; text-align: center;
