@@ -31,7 +31,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS personalizado con branding PC Componentes
+# CSS personalizado con branding PC Componentes - OPTIMIZADO PARA USABILIDAD
 st.markdown("""
 <style>
     /* Colores corporativos PC Componentes */
@@ -113,80 +113,225 @@ st.markdown("""
         transform: translateY(-2px);
     }
     
-    /* Sidebar personalizada */
+    /* ============================================
+       SIDEBAR - OPTIMIZADO PARA USABILIDAD
+       ============================================ */
+    
+    /* Sidebar principal */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #170453 0%, #090029 100%);
     }
     
+    /* Texto general - Color claro pero no blanco puro */
     [data-testid="stSidebar"] * {
-        color: #FFFFFF !important;
+        color: #E8E6F0 !important;
     }
     
+    /* Labels con mejor contraste */
     [data-testid="stSidebar"] .stSelectbox label,
     [data-testid="stSidebar"] .stTextInput label,
     [data-testid="stSidebar"] .stSlider label,
     [data-testid="stSidebar"] .stNumberInput label,
     [data-testid="stSidebar"] .stRadio label {
-        color: #FFD7BF !important;
+        color: #FFB380 !important;
         font-weight: 600;
+        font-size: 0.95rem;
     }
     
-    /* Expanders en sidebar - SIN fondo blanco */
+    /* Expanders con mejor visibilidad */
     [data-testid="stSidebar"] .streamlit-expanderHeader {
-        background-color: rgba(255, 96, 0, 0.15) !important;
+        background-color: rgba(255, 96, 0, 0.25) !important;
         border-radius: 8px;
         color: #FFFFFF !important;
         font-weight: 600;
-        border: 1px solid rgba(255, 96, 0, 0.3);
+        border: 1.5px solid rgba(255, 134, 64, 0.5);
+        padding: 0.75rem 1rem;
+        transition: all 0.2s ease;
     }
     
-    /* Contenido del expander cuando está abierto - SIN fondo blanco */
+    [data-testid="stSidebar"] .streamlit-expanderHeader:hover {
+        background-color: rgba(255, 96, 0, 0.35) !important;
+        border-color: rgba(255, 134, 64, 0.7);
+    }
+    
+    /* Contenido del expander - SIN fondo blanco */
     [data-testid="stSidebar"] .streamlit-expanderContent {
         background-color: transparent !important;
         border: none !important;
+        padding-top: 1rem;
     }
     
-    /* Container del expander completo */
     [data-testid="stSidebar"] details {
         background-color: transparent !important;
+        margin-bottom: 1rem;
     }
     
-    /* Inputs dentro de la sidebar */
+    /* Inputs - ELIMINADO fondo blanco, ahora azul oscuro sólido */
     [data-testid="stSidebar"] input,
-    [data-testid="stSidebar"] select,
     [data-testid="stSidebar"] textarea {
-        background-color: rgba(255, 255, 255, 0.1) !important;
-        border: 1px solid rgba(255, 96, 0, 0.3) !important;
-        color: #FFFFFF !important;
+        background-color: rgba(23, 4, 83, 0.6) !important;
+        border: 2px solid rgba(255, 134, 64, 0.4) !important;
+        color: #F5F5F5 !important;
+        border-radius: 6px;
+        padding: 0.6rem;
+        transition: all 0.2s ease;
+    }
+    
+    [data-testid="stSidebar"] input:hover,
+    [data-testid="stSidebar"] textarea:hover {
+        border-color: rgba(255, 134, 64, 0.6) !important;
+        background-color: rgba(23, 4, 83, 0.8) !important;
+    }
+    
+    /* Placeholders más legibles */
+    [data-testid="stSidebar"] input::placeholder,
+    [data-testid="stSidebar"] textarea::placeholder {
+        color: rgba(255, 179, 128, 0.6) !important;
+        font-style: italic;
+    }
+    
+    /* Focus con mejor visibilidad */
+    [data-testid="stSidebar"] input:focus,
+    [data-testid="stSidebar"] textarea:focus {
+        border-color: #FF8640 !important;
+        box-shadow: 0 0 0 3px rgba(255, 134, 64, 0.25) !important;
+        background-color: rgba(23, 4, 83, 0.9) !important;
+        outline: none;
+    }
+    
+    /* Selectboxes con mejor contraste */
+    [data-testid="stSidebar"] select,
+    [data-testid="stSidebar"] [data-baseweb="select"] {
+        background-color: rgba(23, 4, 83, 0.6) !important;
+        border: 2px solid rgba(255, 134, 64, 0.4) !important;
+        color: #F5F5F5 !important;
         border-radius: 6px;
     }
     
-    [data-testid="stSidebar"] input::placeholder {
-        color: rgba(255, 255, 255, 0.5) !important;
+    [data-testid="stSidebar"] .stSelectbox span {
+        color: #F5F5F5 !important;
     }
     
-    /* Focus en inputs de sidebar */
-    [data-testid="stSidebar"] input:focus,
-    [data-testid="stSidebar"] select:focus {
-        border-color: #FF6000 !important;
-        box-shadow: 0 0 0 2px rgba(255, 96, 0, 0.2) !important;
+    [data-testid="stSidebar"] .stSelectbox > div > div {
+        background-color: rgba(23, 4, 83, 0.6) !important;
+        border: 2px solid rgba(255, 134, 64, 0.4) !important;
     }
     
-    /* Slider en sidebar */
-    [data-testid="stSidebar"] .stSlider {
-        padding: 1rem 0;
+    [data-testid="stSidebar"] .stSelectbox > div > div:hover {
+        border-color: rgba(255, 134, 64, 0.6) !important;
     }
     
-    /* Radio buttons en sidebar */
+    /* Dropdown menus con mejor contraste */
+    [data-testid="stSidebar"] [data-baseweb="popover"] {
+        background-color: #1F0A5C !important;
+        border: 1.5px solid rgba(255, 134, 64, 0.4);
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+    
+    [data-testid="stSidebar"] [role="option"] {
+        background-color: transparent !important;
+        color: #E8E6F0 !important;
+        padding: 0.6rem 1rem;
+        transition: all 0.15s ease;
+    }
+    
+    /* Hover en opciones - SIN blanco, usando naranja */
+    [data-testid="stSidebar"] [role="option"]:hover {
+        background-color: rgba(255, 96, 0, 0.3) !important;
+        color: #FFFFFF !important;
+    }
+    
+    [data-testid="stSidebar"] [aria-selected="true"] {
+        background-color: rgba(255, 96, 0, 0.4) !important;
+        color: #FFFFFF !important;
+        font-weight: 600;
+    }
+    
+    /* Radio buttons */
     [data-testid="stSidebar"] .stRadio > div {
         background-color: transparent !important;
     }
     
-    /* Dividers en sidebar */
-    [data-testid="stSidebar"] hr {
-        border-color: rgba(255, 96, 0, 0.3) !important;
-        margin: 1.5rem 0;
+    [data-testid="stSidebar"] .stRadio label {
+        color: #E8E6F0 !important;
     }
+    
+    [data-testid="stSidebar"] input[type="radio"]:checked + div {
+        background-color: #FF6000 !important;
+        border-color: #FF6000 !important;
+    }
+    
+    /* Sliders */
+    [data-testid="stSidebar"] .stSlider {
+        padding: 1rem 0;
+    }
+    
+    [data-testid="stSidebar"] .stSlider [role="slider"] {
+        background-color: #FF6000 !important;
+    }
+    
+    /* Number Input */
+    [data-testid="stSidebar"] .stNumberInput input {
+        background-color: rgba(23, 4, 83, 0.6) !important;
+        border: 2px solid rgba(255, 134, 64, 0.4) !important;
+        color: #F5F5F5 !important;
+    }
+    
+    [data-testid="stSidebar"] .stNumberInput button {
+        background-color: rgba(255, 96, 0, 0.2) !important;
+        color: #FFB380 !important;
+        border: 1px solid rgba(255, 134, 64, 0.3) !important;
+    }
+    
+    [data-testid="stSidebar"] .stNumberInput button:hover {
+        background-color: rgba(255, 96, 0, 0.4) !important;
+        color: #FFFFFF !important;
+    }
+    
+    /* Info boxes con mejor visibilidad */
+    [data-testid="stSidebar"] .stAlert {
+        background-color: rgba(255, 96, 0, 0.2) !important;
+        border-left: 4px solid #FF8640 !important;
+        border-radius: 8px;
+        color: #F5F5F5 !important;
+        padding: 1rem;
+    }
+    
+    [data-testid="stSidebar"] .stAlert * {
+        color: #F5F5F5 !important;
+    }
+    
+    [data-testid="stSidebar"] .stAlert svg {
+        fill: #FFB380 !important;
+    }
+    
+    /* Dividers */
+    [data-testid="stSidebar"] hr {
+        border-color: rgba(255, 134, 64, 0.3) !important;
+        margin: 1.5rem 0;
+        border-width: 1px;
+    }
+    
+    /* Headers en sidebar */
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3 {
+        color: #FFFFFF !important;
+        font-weight: 700;
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    /* Accesibilidad - Focus visible */
+    [data-testid="stSidebar"] *:focus-visible {
+        outline: 2px solid #FF8640 !important;
+        outline-offset: 2px;
+    }
+    
+    /* ============================================
+       FIN SIDEBAR - ÁREA PRINCIPAL
+       ============================================ */
     
     /* Tabs */
     .stTabs [data-baseweb="tab-list"] {
@@ -221,17 +366,6 @@ st.markdown("""
     .stAlert {
         border-radius: 10px;
         border-left-width: 4px;
-    }
-    
-    /* Info boxes en sidebar */
-    [data-testid="stSidebar"] .stAlert {
-        background-color: rgba(255, 96, 0, 0.15) !important;
-        border-left-color: #FF6000 !important;
-        color: #FFFFFF !important;
-    }
-    
-    [data-testid="stSidebar"] .stAlert * {
-        color: #FFFFFF !important;
     }
     
     /* Success */
@@ -277,7 +411,7 @@ st.markdown("""
         margin: 2rem 0;
     }
     
-    /* Select boxes y inputs */
+    /* Select boxes y inputs del área principal */
     .stSelectbox > div > div {
         border-color: #CCCCCC;
         border-radius: 8px;
@@ -286,35 +420,6 @@ st.markdown("""
     .stSelectbox > div > div:focus-within {
         border-color: #FF6000;
         box-shadow: 0 0 0 2px rgba(255, 96, 0, 0.1);
-    }
-    
-    /* Selectboxes en sidebar */
-    [data-testid="stSidebar"] .stSelectbox > div > div {
-        background-color: rgba(255, 255, 255, 0.1) !important;
-        border-color: rgba(255, 96, 0, 0.3) !important;
-    }
-    
-    /* Dropdown options en sidebar */
-    [data-testid="stSidebar"] [data-baseweb="popover"] {
-        background-color: #170453 !important;
-    }
-    
-    [data-testid="stSidebar"] [role="option"] {
-        background-color: #170453 !important;
-        color: #FFFFFF !important;
-    }
-    
-    [data-testid="stSidebar"] [role="option"]:hover {
-        background-color: rgba(255, 96, 0, 0.3) !important;
-    }
-    
-    [data-testid="stSidebar"] [data-baseweb="select"] {
-        background-color: rgba(255, 255, 255, 0.1) !important;
-    }
-    
-    /* Text en los selectboxes */
-    [data-testid="stSidebar"] .stSelectbox span {
-        color: #FFFFFF !important;
     }
     
     /* File uploader */
