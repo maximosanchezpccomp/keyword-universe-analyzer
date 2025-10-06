@@ -5,7 +5,10 @@ Herramienta profesional de análisis SEO que utiliza IA (Claude de Anthropic) pa
 ## 🎯 Características
 
 - ✅ **Carga múltiple de archivos**: Soporta CSV y Excel de Ahrefs, Semrush y otras herramientas SEO
-- 🤖 **Análisis con IA**: Utiliza Claude 4 Sonnet para análisis semántico profundo
+- 🤖 **Análisis con IA flexible**: 
+  - Claude Sonnet 4.5 para análisis profundo y estratégico
+  - GPT-4o/GPT-4 Turbo para análisis rápido y económico
+  - Validación cruzada con ambos modelos
 - 🔍 **Integración Semrush**: Obtén keywords directamente desde la API
 - 📊 **Visualizaciones interactivas**: Bubble charts, treemaps, sunburst y más
 - 🎯 **Agrupación inteligente**: Agrupa keywords por temas, intención o funnel
@@ -208,18 +211,27 @@ pytest tests/ -v --cov=app
 ## 🤖 APIs Soportadas
 
 ### Anthropic (Claude)
-- **Modelo recomendado**: `claude-sonnet-4-5-20250929`
-- **Uso**: Análisis semántico y agrupación de keywords
-- **Coste**: ~$0.003 por 1K tokens de input
+- **Modelos recomendados**: 
+  - `claude-sonnet-4-5-20250929` (Más inteligente, análisis profundo)
+  - `claude-opus-4-20250514` (Alternativa premium)
+- **Uso**: Análisis semántico y agrupación estratégica de keywords
+- **Costos**: ~$0.15-0.30 por análisis de 1,000 keywords
+- **Cuándo usar**: Estrategia compleja, análisis profundo, reportes para clientes
 
-### Semrush
-- **Endpoints usados**: `domain_organic`, `domain_ranks`
-- **Límites**: 40,000 unidades/día (plan estándar)
-- **Documentación**: [Semrush API Docs](https://www.semrush.com/api-analytics/)
+### OpenAI
+- **Modelos recomendados**:
+  - `gpt-4o` (Más rápido y económico)
+  - `gpt-4-turbo` (Balance calidad-velocidad)
+- **Uso**: Análisis rápido, exploratorio y económico
+- **Costos**: ~$0.10-0.20 por análisis de 1,000 keywords
+- **Cuándo usar**: Quick wins, análisis exploratorio, presupuesto limitado
 
-### OpenAI (Opcional)
-- **Uso**: Análisis complementario o alternativo
-- **Modelos**: GPT-4, GPT-4 Turbo
+### Validación Cruzada (Ambos)
+- **Uso**: Máxima confianza en resultados
+- **Costos**: Suma de ambos (~$0.25-0.50)
+- **Cuándo usar**: Decisiones importantes, grandes inversiones
+
+📚 **Ver comparación detallada**: [docs/AI_PROVIDERS_COMPARISON.md](docs/AI_PROVIDERS_COMPARISON.md)
 
 ## 🔐 Seguridad y Privacidad
 
@@ -267,7 +279,7 @@ Este proyecto está bajo la Licencia MIT. Ver `LICENSE` para más detalles.
 
 ## 👨‍💻 Autor
 
-**Max Sánchez Tendero**
+**Tu Nombre**
 - GitHub: [@maximosanchezpccomp](https://github.com/maximosanchezpccomp)
 - LinkedIn: [Max Sanchez](https://linkedin.com/in/max-sanchez-tendero)
 
