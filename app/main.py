@@ -199,7 +199,7 @@ st.markdown("""
         outline: none;
     }
     
-    /* Selectboxes con mejor contraste */
+    /* Selectboxes - ELIMINADO fondo blanco completamente */
     [data-testid="stSidebar"] select,
     [data-testid="stSidebar"] [data-baseweb="select"] {
         background-color: rgba(23, 4, 83, 0.6) !important;
@@ -208,17 +208,33 @@ st.markdown("""
         border-radius: 6px;
     }
     
-    [data-testid="stSidebar"] .stSelectbox span {
+    /* Todos los elementos internos del selectbox sin blanco */
+    [data-testid="stSidebar"] .stSelectbox,
+    [data-testid="stSidebar"] .stSelectbox > div,
+    [data-testid="stSidebar"] .stSelectbox > div > div,
+    [data-testid="stSidebar"] .stSelectbox [data-baseweb="select"],
+    [data-testid="stSidebar"] .stSelectbox input {
+        background-color: rgba(23, 4, 83, 0.6) !important;
+        border: 2px solid rgba(255, 134, 64, 0.4) !important;
         color: #F5F5F5 !important;
     }
     
-    [data-testid="stSidebar"] .stSelectbox > div > div {
-        background-color: rgba(23, 4, 83, 0.6) !important;
-        border: 2px solid rgba(255, 134, 64, 0.4) !important;
+    /* Texto dentro del selectbox */
+    [data-testid="stSidebar"] .stSelectbox span,
+    [data-testid="stSidebar"] .stSelectbox div {
+        color: #F5F5F5 !important;
+        background-color: transparent !important;
     }
     
+    /* Hover state */
     [data-testid="stSidebar"] .stSelectbox > div > div:hover {
         border-color: rgba(255, 134, 64, 0.6) !important;
+        background-color: rgba(23, 4, 83, 0.8) !important;
+    }
+    
+    /* El contenedor principal del select */
+    [data-testid="stSidebar"] [data-baseweb="select"] > div {
+        background-color: rgba(23, 4, 83, 0.6) !important;
     }
     
     /* Dropdown menus con mejor contraste */
