@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  keyword-universe-analyzer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: keyword-universe-analyzer
+    ports:
+      - "8501:8501"
+    environment:
+      # Cargar desde archivo .env
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SEMRUSH_API_KEY=${SEMRUSH_API_KEY}
+      - DEFAULT_MODEL=${DEFAULT_MODEL:-claude-sonnet-4-5-20250929}
+    volumes:
+      # Montar directorios de datos para persistencia
+      - ./data:/app/data
+      - ./outputs:/app/outputs
+      - ./logs:/app/logs
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - keyword-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  keyword-network:
+    driver: bridge
+
+# Opcional: Añadir servicio de base de datos si es necesario en el futuro
+# postgres:
+#   image: postgres:15-alpine
+#   container_name: keyword-db
+#   environment:
+#     POSTGRES_DB: keyword_universe
+#     POSTGRES_USER: user
+#     POSTGRES_PASSWORD: password
+#   volumes:
+#     - postgres_data:/var/lib/postgresql/data
+#   networks:
+#     - keyword-network
+
+# volumes:
+#   postgres_data:
