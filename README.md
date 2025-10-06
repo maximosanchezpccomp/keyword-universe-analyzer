@@ -2,10 +2,6 @@
 
 Herramienta profesional de análisis SEO que utiliza IA (Claude de Anthropic) para crear universos de keywords completos y estratégicos. Automatiza el proceso de análisis competitivo y agrupación temática de keywords.
 
-[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io/)
-[![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org/)
-[![Claude](https://img.shields.io/badge/Claude-AI-9B4DCA?style=for-the-badge)](https://anthropic.com/)
-
 ## 🎯 Características
 
 - ✅ **Carga múltiple de archivos**: Soporta CSV y Excel de Ahrefs, Semrush y otras herramientas SEO
@@ -214,7 +210,7 @@ pytest tests/ -v --cov=app
 ### Anthropic (Claude)
 - **Modelo recomendado**: `claude-sonnet-4-5-20250929`
 - **Uso**: Análisis semántico y agrupación de keywords
-- **Costos**: ~$0.003 por 1K tokens de input
+- **Coste**: ~$0.003 por 1K tokens de input
 
 ### Semrush
 - **Endpoints usados**: `domain_organic`, `domain_ranks`
@@ -271,9 +267,9 @@ Este proyecto está bajo la Licencia MIT. Ver `LICENSE` para más detalles.
 
 ## 👨‍💻 Autor
 
-**Tu Nombre**
-- GitHub: [@tu-usuario](https://github.com/tu-usuario)
-- LinkedIn: [Tu Perfil](https://linkedin.com/in/tu-perfil)
+**Max Sánchez Tendero**
+- GitHub: [@maximosanchezpccomp](https://github.com/maximosanchezpccomp)
+- LinkedIn: [Max Sanchez](https://linkedin.com/in/max-sanchez-tendero)
 
 ## 🙏 Agradecimientos
 
@@ -284,9 +280,7 @@ Este proyecto está bajo la Licencia MIT. Ver `LICENSE` para más detalles.
 ## 📞 Soporte
 
 ¿Necesitas ayuda? 
-- 📧 Email: support@tudominio.com
-- 💬 Discord: [Únete a nuestro servidor](https://discord.gg/...)
-- 📚 Docs: [docs.tudominio.com](https://docs.tudominio.com)
+- 📧 Email: maximo.sanchez@pccomponentes.com
 
 ---
 
