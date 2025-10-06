@@ -114,7 +114,7 @@ st.markdown("""
     }
     
     /* ============================================
-       SIDEBAR - CONFIGURACIÓN COMPLETA SIN BLANCOS
+       SIDEBAR - CONFIGURACIÓN EQUILIBRADA
        ============================================ */
     
     /* Sidebar principal */
@@ -149,13 +149,13 @@ st.markdown("""
         border-radius: 8px !important;
         color: #FFFFFF !important;
         font-weight: 600 !important;
-        border: 1.5px solid rgba(255, 134, 64, 0.5) !important;
+        border: 1px solid rgba(255, 134, 64, 0.4) !important;
         padding: 0.75rem 1rem !important;
     }
     
     [data-testid="stSidebar"] .streamlit-expanderHeader:hover {
         background-color: rgba(255, 96, 0, 0.35) !important;
-        border-color: rgba(255, 134, 64, 0.7) !important;
+        border-color: rgba(255, 134, 64, 0.6) !important;
     }
     
     [data-testid="stSidebar"] .streamlit-expanderContent {
@@ -173,121 +173,122 @@ st.markdown("""
     [data-testid="stSidebar"] input[type="number"],
     [data-testid="stSidebar"] textarea {
         background-color: #1F0A5C !important;
-        border: 2px solid #FF8640 !important;
+        border: 1px solid rgba(255, 134, 64, 0.3) !important;
         color: #FFFFFF !important;
-        border-radius: 8px !important;
-        padding: 0.75rem !important;
+        border-radius: 6px !important;
+        padding: 0.65rem !important;
     }
     
     [data-testid="stSidebar"] input::placeholder,
     [data-testid="stSidebar"] textarea::placeholder {
         color: #B8A0D4 !important;
-        opacity: 0.7 !important;
+        opacity: 0.6 !important;
+    }
+    
+    [data-testid="stSidebar"] input:hover,
+    [data-testid="stSidebar"] textarea:hover {
+        border-color: rgba(255, 134, 64, 0.5) !important;
     }
     
     [data-testid="stSidebar"] input:focus,
     [data-testid="stSidebar"] textarea:focus {
-        border-color: #FF6000 !important;
-        box-shadow: 0 0 0 3px rgba(255, 96, 0, 0.3) !important;
+        border-color: #FF8640 !important;
+        box-shadow: 0 0 0 2px rgba(255, 134, 64, 0.2) !important;
         outline: none !important;
     }
     
-    /* ========== SELECTBOXES - ENFOQUE AGRESIVO ========== */
-    /* Contenedor principal del selectbox */
+    /* ========== SELECTBOXES ========== */
+    /* Contenedor principal */
     [data-testid="stSidebar"] .stSelectbox {
         background-color: transparent !important;
     }
     
-    /* TODOS los divs dentro del selectbox */
-    [data-testid="stSidebar"] .stSelectbox div,
-    [data-testid="stSidebar"] .stSelectbox > div,
-    [data-testid="stSidebar"] .stSelectbox > div > div,
-    [data-testid="stSidebar"] .stSelectbox > div > div > div {
+    /* TODOS los divs - SIN bordes naranjas excesivos */
+    [data-testid="stSidebar"] .stSelectbox div {
         background-color: #1F0A5C !important;
-        border: 2px solid #FF8640 !important;
-        border-radius: 8px !important;
+        border: 1px solid rgba(255, 134, 64, 0.3) !important;
+        border-radius: 6px !important;
     }
     
-    /* Componente base de Streamlit */
+    /* Eliminar bordes de elementos internos innecesarios */
+    [data-testid="stSidebar"] .stSelectbox > div > div > div,
+    [data-testid="stSidebar"] .stSelectbox span {
+        border: none !important;
+    }
+    
+    /* Solo el contenedor principal tiene borde */
+    [data-testid="stSidebar"] .stSelectbox > div > div {
+        background-color: #1F0A5C !important;
+        border: 1px solid rgba(255, 134, 64, 0.3) !important;
+        border-radius: 6px !important;
+    }
+    
+    [data-testid="stSidebar"] .stSelectbox > div > div:hover {
+        border-color: rgba(255, 134, 64, 0.5) !important;
+    }
+    
+    /* Componente base */
     [data-testid="stSidebar"] [data-baseweb="select"],
     [data-testid="stSidebar"] [data-baseweb="select"] > div,
     [data-testid="stSidebar"] [data-baseweb="select"] * {
-        background-color: #1F0A5C !important;
-        color: #FFFFFF !important;
-    }
-    
-    /* Input interno del select */
-    [data-testid="stSidebar"] .stSelectbox input {
-        background-color: #1F0A5C !important;
+        background-color: transparent !important;
         color: #FFFFFF !important;
         border: none !important;
     }
     
-    /* Texto mostrado en el select */
+    /* Input interno sin borde */
+    [data-testid="stSidebar"] .stSelectbox input {
+        background-color: transparent !important;
+        color: #FFFFFF !important;
+        border: none !important;
+    }
+    
+    /* Texto */
     [data-testid="stSidebar"] .stSelectbox span {
         color: #FFFFFF !important;
+        background-color: transparent !important;
     }
     
-    /* Hover en el selectbox */
-    [data-testid="stSidebar"] .stSelectbox:hover div {
-        border-color: #FF6000 !important;
-    }
-    
-    /* ========== DROPDOWN MENU (cuando se abre el select) ========== */
+    /* ========== DROPDOWN MENU ========== */
     [data-testid="stSidebar"] [data-baseweb="popover"],
     [data-testid="stSidebar"] [data-baseweb="popover"] > div,
     [data-testid="stSidebar"] [role="listbox"] {
         background-color: #1F0A5C !important;
-        border: 2px solid #FF8640 !important;
-        border-radius: 8px !important;
-        max-height: none !important;
-        overflow: visible !important;
-    }
-    
-    /* Contenedor interno del listbox */
-    [data-testid="stSidebar"] [role="listbox"] > div {
-        background-color: #1F0A5C !important;
-        max-height: none !important;
+        border: 1px solid rgba(255, 134, 64, 0.4) !important;
+        border-radius: 6px !important;
+        max-height: 300px !important;
         overflow-y: auto !important;
     }
     
-    /* Opciones del dropdown */
+    /* Contenedor interno */
+    [data-testid="stSidebar"] [role="listbox"] > div {
+        background-color: transparent !important;
+    }
+    
+    /* Opciones - SIN bordes individuales */
     [data-testid="stSidebar"] [role="option"],
     [data-testid="stSidebar"] [role="option"] > div,
     [data-testid="stSidebar"] [role="option"] * {
         background-color: transparent !important;
         color: #E8E6F0 !important;
-        padding: 0.75rem 1rem !important;
-        line-height: 1.5 !important;
-        white-space: normal !important;
-        word-wrap: break-word !important;
-        overflow: visible !important;
-        min-height: auto !important;
-        height: auto !important;
+        padding: 0.65rem 1rem !important;
+        border: none !important;
+        line-height: 1.4 !important;
     }
     
-    /* Asegurar que el texto se vea completo */
-    [data-testid="stSidebar"] [role="option"] span,
-    [data-testid="stSidebar"] [role="option"] div {
-        display: block !important;
-        width: 100% !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
-    }
-    
-    /* Hover en opciones */
+    /* Hover */
     [data-testid="stSidebar"] [role="option"]:hover,
     [data-testid="stSidebar"] [role="option"]:hover > div,
     [data-testid="stSidebar"] [role="option"]:hover * {
-        background-color: rgba(255, 96, 0, 0.4) !important;
+        background-color: rgba(255, 96, 0, 0.3) !important;
         color: #FFFFFF !important;
     }
     
-    /* Opción seleccionada */
+    /* Seleccionado */
     [data-testid="stSidebar"] [aria-selected="true"],
     [data-testid="stSidebar"] [aria-selected="true"] > div,
     [data-testid="stSidebar"] [aria-selected="true"] * {
-        background-color: rgba(255, 96, 0, 0.5) !important;
+        background-color: rgba(255, 96, 0, 0.4) !important;
         color: #FFFFFF !important;
         font-weight: 600 !important;
     }
@@ -314,35 +315,56 @@ st.markdown("""
     /* ========== NUMBER INPUT ========== */
     [data-testid="stSidebar"] .stNumberInput input {
         background-color: #1F0A5C !important;
-        border: 2px solid #FF8640 !important;
+        border: 1px solid rgba(255, 134, 64, 0.3) !important;
         color: #FFFFFF !important;
-        border-radius: 8px !important;
+        border-radius: 6px !important;
     }
     
+    [data-testid="stSidebar"] .stNumberInput input:hover {
+        border-color: rgba(255, 134, 64, 0.5) !important;
+    }
+    
+    [data-testid="stSidebar"] .stNumberInput input:focus {
+        border-color: #FF8640 !important;
+        box-shadow: 0 0 0 2px rgba(255, 134, 64, 0.2) !important;
+    }
+    
+    /* Botones del number input - MÁS SUTILES */
     [data-testid="stSidebar"] .stNumberInput button {
-        background-color: rgba(255, 96, 0, 0.3) !important;
+        background-color: rgba(255, 96, 0, 0.2) !important;
         color: #FFB380 !important;
-        border: 1px solid #FF8640 !important;
+        border: none !important;
+        border-radius: 0 !important;
     }
     
     [data-testid="stSidebar"] .stNumberInput button:hover {
-        background-color: rgba(255, 96, 0, 0.5) !important;
+        background-color: rgba(255, 96, 0, 0.35) !important;
         color: #FFFFFF !important;
     }
     
     /* ========== TEXT AREAS ========== */
     [data-testid="stSidebar"] .stTextArea textarea {
         background-color: #1F0A5C !important;
-        border: 2px solid #FF8640 !important;
+        border: 1px solid rgba(255, 134, 64, 0.3) !important;
         color: #FFFFFF !important;
-        border-radius: 8px !important;
+        border-radius: 6px !important;
+    }
+    
+    [data-testid="stSidebar"] .stTextArea textarea:hover {
+        border-color: rgba(255, 134, 64, 0.5) !important;
+    }
+    
+    [data-testid="stSidebar"] .stTextArea textarea:focus {
+        border-color: #FF8640 !important;
+        box-shadow: 0 0 0 2px rgba(255, 134, 64, 0.2) !important;
     }
     
     /* ========== INFO BOXES ========== */
     [data-testid="stSidebar"] .stAlert {
-        background-color: rgba(255, 96, 0, 0.2) !important;
-        border-left: 4px solid #FF8640 !important;
+        background-color: rgba(255, 96, 0, 0.15) !important;
+        border-left: 3px solid #FF8640 !important;
         color: #F5F5F5 !important;
+        border-radius: 6px !important;
     }
     
     [data-testid="stSidebar"] .stAlert * {
@@ -351,7 +373,7 @@ st.markdown("""
     
     /* ========== DIVIDERS ========== */
     [data-testid="stSidebar"] hr {
-        border-color: rgba(255, 134, 64, 0.4) !important;
+        border-color: rgba(255, 134, 64, 0.3) !important;
         margin: 1.5rem 0 !important;
     }
     
@@ -365,7 +387,7 @@ st.markdown("""
     
     /* ========== ACCESIBILIDAD ========== */
     [data-testid="stSidebar"] *:focus-visible {
-        outline: 2px solid #FF6000 !important;
+        outline: 2px solid #FF8640 !important;
         outline-offset: 2px !important;
     }
     
