@@ -25,7 +25,7 @@ SEMRUSH_API_KEY = os.getenv("SEMRUSH_API_KEY")
 APP_CONFIG = {
     "title": os.getenv("APP_TITLE", "Keyword Universe Analyzer"),
     "version": "1.0.0",
-    "author": "Max Sánchez",
+    "author": "Tu Nombre",
     "description": "Herramienta de análisis SEO con IA"
 }
 
@@ -115,7 +115,7 @@ EXPORT_CONFIG = {
 
 # Mensajes y textos de la UI
 UI_MESSAGES = {
-    "welcome": "👋 Bienvenido al Keyword Universe Analyzer de PcComponentes",
+    "welcome": "👋 Bienvenido al Keyword Universe Analyzer",
     "upload_prompt": "Sube tus archivos de keywords para comenzar",
     "analyzing": "🧠 Analizando tus keywords con Claude...",
     "success": "✅ Análisis completado exitosamente",
