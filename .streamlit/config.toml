@@ -1,0 +1,30 @@
+# Configuración de Streamlit con branding PC Componentes
+
+[theme]
+# Color principal - Naranja PC
+primaryColor = "#FF6000"
+
+# Color de fondo - Blanco
+backgroundColor = "#FFFFFF"
+
+# Color de fondo secundario - Gris muy claro
+secondaryBackgroundColor = "#F5F5F5"
+
+# Color de texto principal - Azul oscuro
+textColor = "#090029"
+
+# Fuente
+font = "sans serif"
+
+[server]
+headless = true
+port = 8501
+enableCORS = false
+enableXsrfProtection = true
+
+[browser]
+gatherUsageStats = false
+
+[client]
+showErrorDetails = true
+toolbarMode = "minimal"
