@@ -28,7 +28,7 @@ class OpenAIService:
     ) -> List[Dict[str, str]]:
         """Crea los mensajes para OpenAI en formato chat"""
         
-        # ARREGLO: Seleccionar solo columnas disponibles
+        # Seleccionar solo columnas disponibles
         columns_to_use = ['keyword', 'volume']
         if 'traffic' in df.columns:
             columns_to_use.append('traffic')
@@ -51,7 +51,7 @@ class OpenAIService:
         # Determinar tipo de análisis
         analysis_instructions = self._get_analysis_instructions(analysis_type)
         
-        # Secciones opcionales
+        # ARREGLO: Construir secciones opcionales ANTES del f-string
         gaps_section = ""
         if include_gaps:
             gaps_section = """,
@@ -77,6 +77,25 @@ class OpenAIService:
         }
     ]"""
         
+        # Instrucciones adicionales
+        extra_instructions = ""
+        if custom_instructions:
+            extra_instructions = f"\n{custom_instructions}\n"
+        
+        if include_semantic:
+            extra_instructions += "\nIMPORTANTE: Realiza análisis semántico profundo para entender la intención real detrás de cada keyword."
+        
+        if include_trends:
+            extra_instructions += "\nIMPORTANTE: Identifica tendencias emergentes y keywords en crecimiento."
+        
+        if include_gaps:
+            extra_instructions += "\nIMPORTANTE: Detecta gaps de contenido - topics con alto volumen pero poca cobertura competitiva."
+        
+        # Formatear stats de traffic si existe
+        traffic_stats = ""
+        if 'total_traffic' in stats:
+            traffic_stats = f"\n- Tráfico total: {stats['total_traffic']:,}"
+        
         system_message = """Eres un experto en SEO y análisis estratégico de keywords. 
 Tu especialidad es identificar patrones, oportunidades y crear estrategias data-driven.
 Siempre respondes con JSON válido y análisis profundos."""
@@ -87,8 +106,7 @@ Siempre respondes con JSON válido y análisis profundos."""
 - Total keywords: {stats['total_keywords']:,}
 - Volumen total: {stats['total_volume']:,}
 - Volumen promedio: {stats['avg_volume']:,}
-- Keywords únicas: {stats['unique_keywords']:,}
-{f"- Tráfico total: {stats.get('total_traffic', 'N/A'):,}" if 'total_traffic' in stats else ""}
+- Keywords únicas: {stats['unique_keywords']:,}{traffic_stats}
 
 # TIPO DE ANÁLISIS
 {analysis_type}
@@ -100,11 +118,7 @@ Crea un análisis con {num_tiers} tiers (niveles) de prioridad:
 - Tier 1: Alto volumen y máxima prioridad estratégica
 - Tier {num_tiers}: Menor volumen pero oportunidades específicas
 
-{custom_instructions}
-
-{"IMPORTANTE: Realiza análisis semántico profundo para entender la intención real detrás de cada keyword." if include_semantic else ""}
-{"IMPORTANTE: Identifica tendencias emergentes y keywords en crecimiento." if include_trends else ""}
-{"IMPORTANTE: Detecta gaps de contenido - topics con alto volumen pero poca cobertura competitiva." if include_gaps else ""}
+{extra_instructions}
 
 # FORMATO DE RESPUESTA (CRÍTICO - RESPONDER SOLO CON JSON)
 Responde ÚNICAMENTE con un JSON válido con esta estructura:
