@@ -1,20 +1,9 @@
 """
 Servicios de integración con APIs externas
+
+NOTA: Los imports se hacen directamente en los módulos que los necesitan
+      para evitar importaciones circulares.
 """
 
-from app.services.anthropic_service import AnthropicService
-from app.services.semrush_service import SemrushService
-
-# OpenAI es opcional, solo importar si existe
-try:
-    from app.services.openai_service import OpenAIService
-    __all__ = [
-        'AnthropicService',
-        'SemrushService',
-        'OpenAIService',
-    ]
-except ImportError:
-    __all__ = [
-        'AnthropicService',
-        'SemrushService',
-    ]
+# No importar nada automáticamente para evitar circular imports
+__all__ = []
