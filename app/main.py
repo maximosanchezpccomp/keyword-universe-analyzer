@@ -916,7 +916,7 @@ https://example.com/specific-page.html""",
         # Validar API keys según proveedor
         if ai_provider == "Claude (Anthropic)" and not anthropic_key:
             st.warning("⚠️ Por favor ingresa tu API key de Anthropic en la barra lateral")
-            return
+
         elif ai_provider == "OpenAI" and not openai_key:
             st.warning("⚠️ Por favor ingresa tu API key de OpenAI en la barra lateral")
             return
