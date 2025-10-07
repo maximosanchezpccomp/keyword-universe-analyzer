@@ -710,7 +710,6 @@ def main():
     # TAB 1: Carga de datos
     with tab1:
         st.header("Carga tus archivos de keywords")
-        
         col1, col2 = st.columns([2, 1])
         
         with col1:
