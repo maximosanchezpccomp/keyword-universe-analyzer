@@ -77,17 +77,18 @@ class DataProcessor:
         
         # Calcular métricas adicionales
         combined_df = self._calculate_metrics(combined_df)
-    
-    if 'traffic' not in combined_df.columns:
-        # Estimar tráfico como ~30% del volumen (CTR promedio estimado)
-        combined_df['traffic'] = (combined_df['volume'] * 0.3).astype(int)
-        print("⚠️ Columna 'traffic' no encontrada. Estimada basada en volumen.")
-    
-    # Validar que traffic no tenga valores nulos
-    if combined_df['traffic'].isnull().any():
-        combined_df['traffic'] = combined_df['traffic'].fillna(
-            (combined_df['volume'] * 0.3).astype(int)
-        )
+        
+        # ARREGLO: Asegurar que la columna traffic siempre existe
+        if 'traffic' not in combined_df.columns:
+            # Estimar tráfico como ~30% del volumen (CTR promedio estimado)
+            combined_df['traffic'] = (combined_df['volume'] * 0.3).astype(int)
+            print("⚠️ Columna 'traffic' no encontrada. Estimada basada en volumen.")
+        
+        # Validar que traffic no tenga valores nulos
+        if combined_df['traffic'].isnull().any():
+            combined_df['traffic'] = combined_df['traffic'].fillna(
+                (combined_df['volume'] * 0.3).astype(int)
+            )
         
         return combined_df
     
@@ -131,7 +132,8 @@ class DataProcessor:
         # Añadir columnas opcionales si no existen
         if 'traffic' not in df.columns:
             # Estimar tráfico como % del volumen
-            df['traffic'] = df['volume'] * 0.3  # ~30% CTR promedio
+            if 'volume' in df.columns:
+                df['traffic'] = (df['volume'] * 0.3).astype(int)
         
         if 'difficulty' not in df.columns:
             df['difficulty'] = 50  # Valor medio por defecto
@@ -156,8 +158,9 @@ class DataProcessor:
         # Convertir volumen a numérico
         df['volume'] = pd.to_numeric(df['volume'], errors='coerce').fillna(0).astype(int)
         
-        # Convertir tráfico a numérico
-        df['traffic'] = pd.to_numeric(df['traffic'], errors='coerce').fillna(0).astype(int)
+        # Convertir tráfico a numérico si existe
+        if 'traffic' in df.columns:
+            df['traffic'] = pd.to_numeric(df['traffic'], errors='coerce').fillna(0).astype(int)
         
         # Eliminar keywords con volumen 0
         df = df[df['volume'] > 0]
@@ -179,8 +182,9 @@ class DataProcessor:
     def _calculate_metrics(self, df: pd.DataFrame) -> pd.DataFrame:
         """Calcula métricas adicionales"""
         
-        # CTR estimado
-        df['ctr_estimate'] = (df['traffic'] / df['volume'] * 100).clip(0, 100)
+        # CTR estimado (solo si traffic existe)
+        if 'traffic' in df.columns:
+            df['ctr_estimate'] = (df['traffic'] / df['volume'] * 100).clip(0, 100)
         
         # Longitud de keyword
         df['keyword_length'] = df['keyword'].str.split().str.len()
@@ -223,11 +227,20 @@ class DataProcessor:
             'total_volume': int(df['volume'].sum()),
             'avg_volume': int(df['volume'].mean()),
             'median_volume': int(df['volume'].median()),
-            'total_traffic': int(df['traffic'].sum()),
-            'avg_traffic': int(df['traffic'].mean()),
-            'keyword_types': df['keyword_type'].value_counts().to_dict() if 'keyword_type' in df.columns else {},
-            'sources': df['source'].value_counts().to_dict() if 'source' in df.columns else {}
         }
+        
+        # Añadir stats de traffic solo si existe
+        if 'traffic' in df.columns:
+            stats['total_traffic'] = int(df['traffic'].sum())
+            stats['avg_traffic'] = int(df['traffic'].mean())
+        
+        # Añadir keyword types solo si existe
+        if 'keyword_type' in df.columns:
+            stats['keyword_types'] = df['keyword_type'].value_counts().to_dict()
+        
+        # Añadir sources solo si existe
+        if 'source' in df.columns:
+            stats['sources'] = df['source'].value_counts().to_dict()
         
         return stats
     
