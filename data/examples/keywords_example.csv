@@ -1,21 +1,52 @@
-keyword,volume,traffic,difficulty,cpc
-seo tools,12100,3630,67,2.45
-keyword research,8100,2430,63,1.85
-backlink checker,5400,1620,58,3.20
-rank tracker,4400,1320,55,2.10
-seo audit,3600,1080,52,1.95
-content optimization,2900,870,48,1.65
-competitor analysis,2400,720,56,2.80
-link building,1900,570,62,2.35
-on page seo,1600,480,49,1.55
-technical seo,1300,390,54,1.75
-local seo,1000,300,47,2.15
-seo reporting,880,264,51,1.90
-keyword difficulty,720,216,53,1.70
-serp analysis,590,177,50,1.60
-site audit tool,480,144,55,2.25
-backlink analysis,390,117,57,2.90
-organic traffic,320,96,46,1.45
-search visibility,260,78,48,1.55
-rank tracking software,210,63,59,3.10
-keyword clustering,170,51,52,1.80
+keyword,volume,difficulty,cpc
+seo tools,12100,67,2.45
+keyword research,8100,63,1.85
+backlink checker,5400,58,3.20
+rank tracker,4400,55,2.10
+seo audit,3600,52,1.95
+content optimization,2900,48,1.65
+competitor analysis,2400,56,2.80
+link building,1900,62,2.35
+on page seo,1600,49,1.55
+technical seo,1300,54,1.75
+local seo,1000,47,2.15
+seo reporting,880,51,1.90
+keyword difficulty,720,53,1.70
+serp analysis,590,50,1.60
+site audit tool,480,55,2.25
+backlink analysis,390,57,2.90
+organic traffic,320,46,1.45
+search visibility,260,48,1.55
+rank tracking software,210,59,3.10
+keyword clustering,170,52,1.80
+seo strategy,140,44,1.35
+meta tags optimization,110,42,1.20
+schema markup,95,56,1.95
+xml sitemap,82,38,0.95
+robots txt,68,35,0.85
+canonical tags,57,51,1.65
+301 redirects,48,47,1.40
+page speed optimization,42,53,1.85
+mobile seo,38,49,1.55
+core web vitals,32,58,2.10
+structured data,28,54,1.90
+internal linking,24,41,1.25
+anchor text optimization,21,46,1.50
+alt text seo,18,39,1.10
+breadcrumb navigation,16,43,1.30
+hreflang tags,14,62,2.25
+duplicate content,12,48,1.45
+thin content,11,45,1.35
+keyword cannibalization,9,52,1.75
+crawl budget,8,64,2.40
+index bloat,7,59,2.15
+orphan pages,6,55,1.95
+broken links,5,37,1.05
+soft 404 errors,4,51,1.70
+noindex tag,4,46,1.40
+url structure,3,42,1.25
+pagination seo,3,58,2.05
+faceted navigation,2,67,2.55
+javascript seo,2,71,2.85
+dynamic rendering,2,74,3.10
+log file analysis,1,69,2.70
