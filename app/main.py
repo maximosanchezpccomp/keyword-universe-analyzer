@@ -919,10 +919,10 @@ https://example.com/specific-page.html""",
 
         elif ai_provider == "OpenAI" and not openai_key:
             st.warning("⚠️ Por favor ingresa tu API key de OpenAI en la barra lateral")
-            return
+         
         elif ai_provider == "Ambos (Validación Cruzada)" and (not anthropic_key or not openai_key):
             st.warning("⚠️ Para validación cruzada necesitas ambas API keys")
-            return
+    
         
         if not st.session_state.uploaded_files and st.session_state.processed_data is None:
             st.info("📁 Primero carga datos en la pestaña 'Carga de Datos'")
