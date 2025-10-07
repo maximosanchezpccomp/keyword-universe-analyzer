@@ -926,7 +926,6 @@ https://example.com/specific-page.html""",
         
         if not st.session_state.uploaded_files and st.session_state.processed_data is None:
             st.info("📁 Primero carga datos en la pestaña 'Carga de Datos'")
-            return
         
         # Preparar datos
         if st.session_state.processed_data is None and st.session_state.uploaded_files:
