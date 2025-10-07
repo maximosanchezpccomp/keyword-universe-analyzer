@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from typing import List, Dict, Any
 import io
+import streamlit as st
 
 class DataProcessor:
     """Procesador de datos de keywords desde múltiples fuentes"""
@@ -15,6 +16,7 @@ class DataProcessor:
             'Traffic': 'traffic',
             'KD': 'difficulty',
             'CPC': 'cpc',
+            'Position': 'position',
             
             # Semrush
             'Keyword ': 'keyword',
@@ -23,7 +25,7 @@ class DataProcessor:
             'Keyword Difficulty': 'difficulty',
             'CPC (USD)': 'cpc',
             
-            # Google Search Console (posible)
+            # Google Search Console
             'query': 'keyword',
             'clicks': 'traffic',
             'impressions': 'volume',
@@ -31,45 +33,101 @@ class DataProcessor:
             # Otros formatos comunes
             'keyword_text': 'keyword',
             'search_volume': 'volume',
-            'monthly_volume': 'volume'
+            'monthly_volume': 'volume',
+            'kw': 'keyword',
+            'term': 'keyword',
+            'search_term': 'keyword',
         }
     
     def process_files(self, uploaded_files: List, max_keywords: int = 1000) -> pd.DataFrame:
         """Procesa múltiples archivos cargados y los unifica"""
         
         all_dataframes = []
+        errors = []
         
         for file in uploaded_files:
             try:
-                # Leer archivo
+                st.info(f"📂 Procesando: {file.name}")
+                
+                # Resetear el puntero del archivo
+                file.seek(0)
+                
+                # Leer archivo según extensión
                 if file.name.endswith('.csv'):
-                    df = pd.read_csv(file)
-                else:
+                    # Intentar diferentes encodings
+                    df = self._read_csv_safe(file)
+                elif file.name.endswith(('.xlsx', '.xls')):
                     df = pd.read_excel(file)
+                else:
+                    errors.append(f"{file.name}: Formato no soportado")
+                    continue
+                
+                if df is None or df.empty:
+                    errors.append(f"{file.name}: Archivo vacío")
+                    continue
+                
+                st.write(f"  ✓ Leído: {len(df)} filas, {len(df.columns)} columnas")
+                st.write(f"  📋 Columnas detectadas: {', '.join(df.columns[:5])}...")
                 
                 # Normalizar columnas
                 df = self._normalize_columns(df)
                 
+                # Validar que tiene las columnas mínimas necesarias
+                if 'keyword' not in df.columns:
+                    errors.append(f"{file.name}: No se encontró columna de keywords")
+                    continue
+                
+                if 'volume' not in df.columns:
+                    st.warning(f"  ⚠️ {file.name}: No tiene columna de volumen, se usará valor 0")
+                    df['volume'] = 0
+                
                 # Validar y limpiar datos
                 df = self._clean_data(df)
+                
+                if df.empty:
+                    errors.append(f"{file.name}: No quedaron datos válidos después de limpiar")
+                    continue
                 
                 # Añadir origen del archivo
                 df['source'] = file.name.split('.')[0]
                 
                 # Limitar a max_keywords
                 if len(df) > max_keywords:
+                    st.warning(f"  ⚠️ Limitando a {max_keywords} keywords (de {len(df)})")
                     df = df.nlargest(max_keywords, 'volume')
                 
                 all_dataframes.append(df)
+                st.success(f"  ✅ {file.name}: {len(df)} keywords procesadas")
                 
             except Exception as e:
-                print(f"Error procesando {file.name}: {str(e)}")
+                error_msg = f"{file.name}: {str(e)}"
+                errors.append(error_msg)
+                st.error(f"  ❌ Error: {str(e)}")
                 continue
         
+        # Mostrar resumen de errores si los hay
+        if errors:
+            with st.expander("⚠️ Ver errores detallados", expanded=False):
+                for error in errors:
+                    st.write(f"- {error}")
+        
+        # Verificar que se procesó al menos un archivo
         if not all_dataframes:
-            raise ValueError("No se pudo procesar ningún archivo")
+            # Mensaje de error más descriptivo
+            error_detail = "\n".join(errors) if errors else "Formato de archivo no compatible"
+            raise ValueError(
+                f"No se pudo procesar ningún archivo.\n\n"
+                f"Posibles causas:\n"
+                f"1. El archivo no tiene columnas 'keyword' o 'volume'\n"
+                f"2. El formato no es CSV o Excel válido\n"
+                f"3. El archivo está vacío\n\n"
+                f"Detalles:\n{error_detail}\n\n"
+                f"💡 Tip: Asegúrate de que tu archivo tiene al menos una columna llamada "
+                f"'Keyword' o 'keyword' y opcionalmente 'Volume' o 'volume'"
+            )
         
         # Combinar todos los dataframes
+        st.info("🔄 Combinando archivos...")
         combined_df = pd.concat(all_dataframes, ignore_index=True)
         
         # Deduplicar keywords
@@ -78,19 +136,30 @@ class DataProcessor:
         # Calcular métricas adicionales
         combined_df = self._calculate_metrics(combined_df)
         
-        # ARREGLO: Asegurar que la columna traffic siempre existe
-        if 'traffic' not in combined_df.columns:
-            # Estimar tráfico como ~30% del volumen (CTR promedio estimado)
-            combined_df['traffic'] = (combined_df['volume'] * 0.3).astype(int)
-            print("⚠️ Columna 'traffic' no encontrada. Estimada basada en volumen.")
-        
-        # Validar que traffic no tenga valores nulos
-        if combined_df['traffic'].isnull().any():
-            combined_df['traffic'] = combined_df['traffic'].fillna(
-                (combined_df['volume'] * 0.3).astype(int)
-            )
+        st.success(f"✅ Procesamiento completado: {len(combined_df)} keywords únicas")
         
         return combined_df
+    
+    def _read_csv_safe(self, file) -> pd.DataFrame:
+        """Lee CSV intentando diferentes encodings"""
+        encodings = ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252']
+        
+        for encoding in encodings:
+            try:
+                file.seek(0)
+                df = pd.read_csv(file, encoding=encoding)
+                if not df.empty:
+                    return df
+            except Exception:
+                continue
+        
+        # Si todo falla, intentar con engine python
+        try:
+            file.seek(0)
+            return pd.read_csv(file, engine='python')
+        except Exception as e:
+            st.error(f"No se pudo leer el CSV: {str(e)}")
+            return None
     
     def _normalize_columns(self, df: pd.DataFrame) -> pd.DataFrame:
         """Normaliza los nombres de las columnas"""
@@ -107,36 +176,49 @@ class DataProcessor:
                 rename_dict[col] = self.column_mapping[col_clean]
             else:
                 # Normalizar a minúsculas y espacios a guiones bajos
-                rename_dict[col] = col_clean.lower().replace(' ', '_')
+                normalized = col_clean.lower().replace(' ', '_')
+                rename_dict[col] = normalized
         
         df = df.rename(columns=rename_dict)
         
         # Asegurar columnas mínimas necesarias
-        required_columns = ['keyword', 'volume']
+        required_columns = ['keyword']
         
         for req_col in required_columns:
             if req_col not in df.columns:
                 # Intentar inferir
                 if req_col == 'keyword':
-                    # Buscar la primera columna de texto
+                    # Buscar la primera columna de texto que no sea URL
                     for col in df.columns:
-                        if df[col].dtype == 'object':
+                        if df[col].dtype == 'object' and not col.startswith('url'):
                             df['keyword'] = df[col]
+                            st.info(f"  ℹ️ Usando columna '{col}' como keywords")
                             break
-                elif req_col == 'volume':
-                    # Buscar columnas numéricas
-                    numeric_cols = df.select_dtypes(include=[np.number]).columns
-                    if len(numeric_cols) > 0:
-                        df['volume'] = df[numeric_cols[0]]
         
         # Añadir columnas opcionales si no existen
+        if 'volume' not in df.columns:
+            # Buscar columnas numéricas que puedan ser volumen
+            for col in df.columns:
+                if 'volume' in col.lower() or 'search' in col.lower():
+                    df['volume'] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+                    st.info(f"  ℹ️ Usando columna '{col}' como volumen")
+                    break
+            
+            # Si no se encontró, usar columna numérica más grande
+            if 'volume' not in df.columns:
+                numeric_cols = df.select_dtypes(include=[np.number]).columns
+                if len(numeric_cols) > 0:
+                    df['volume'] = df[numeric_cols[0]]
+                    st.info(f"  ℹ️ Usando columna '{numeric_cols[0]}' como volumen")
+                else:
+                    df['volume'] = 0
+        
         if 'traffic' not in df.columns:
             # Estimar tráfico como % del volumen
-            if 'volume' in df.columns:
-                df['traffic'] = (df['volume'] * 0.3).astype(int)
+            df['traffic'] = df['volume'] * 0.3
         
         if 'difficulty' not in df.columns:
-            df['difficulty'] = 50  # Valor medio por defecto
+            df['difficulty'] = 50
         
         if 'cpc' not in df.columns:
             df['cpc'] = 0
@@ -146,45 +228,59 @@ class DataProcessor:
     def _clean_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Limpia y valida los datos"""
         
+        initial_count = len(df)
+        
         # Eliminar filas sin keyword
         df = df.dropna(subset=['keyword'])
         
         # Convertir keyword a string y limpiar
         df['keyword'] = df['keyword'].astype(str).str.strip().str.lower()
         
-        # Eliminar keywords vacías
-        df = df[df['keyword'] != '']
+        # Eliminar keywords vacías o muy cortas
+        df = df[df['keyword'].str.len() > 1]
         
         # Convertir volumen a numérico
         df['volume'] = pd.to_numeric(df['volume'], errors='coerce').fillna(0).astype(int)
         
-        # Convertir tráfico a numérico si existe
-        if 'traffic' in df.columns:
-            df['traffic'] = pd.to_numeric(df['traffic'], errors='coerce').fillna(0).astype(int)
+        # Convertir tráfico a numérico
+        df['traffic'] = pd.to_numeric(df['traffic'], errors='coerce').fillna(0).astype(int)
         
-        # Eliminar keywords con volumen 0
-        df = df[df['volume'] > 0]
+        # Eliminar keywords con volumen negativo
+        df = df[df['volume'] >= 0]
         
         # Eliminar duplicados dentro del mismo archivo
         df = df.drop_duplicates(subset=['keyword'], keep='first')
+        
+        cleaned_count = len(df)
+        removed = initial_count - cleaned_count
+        
+        if removed > 0:
+            st.info(f"  ℹ️ Eliminadas {removed} filas inválidas")
         
         return df
     
     def _deduplicate_keywords(self, df: pd.DataFrame) -> pd.DataFrame:
         """Deduplica keywords manteniendo el mayor volumen"""
         
+        initial_count = len(df)
+        
         # Agrupar por keyword y mantener el registro con mayor volumen
         df = df.sort_values('volume', ascending=False)
         df = df.drop_duplicates(subset=['keyword'], keep='first')
+        
+        deduped_count = len(df)
+        removed = initial_count - deduped_count
+        
+        if removed > 0:
+            st.info(f"  ℹ️ Eliminados {removed} duplicados")
         
         return df
     
     def _calculate_metrics(self, df: pd.DataFrame) -> pd.DataFrame:
         """Calcula métricas adicionales"""
         
-        # CTR estimado (solo si traffic existe)
-        if 'traffic' in df.columns:
-            df['ctr_estimate'] = (df['traffic'] / df['volume'] * 100).clip(0, 100)
+        # CTR estimado
+        df['ctr_estimate'] = (df['traffic'] / df['volume'] * 100).clip(0, 100)
         
         # Longitud de keyword
         df['keyword_length'] = df['keyword'].str.split().str.len()
@@ -227,20 +323,11 @@ class DataProcessor:
             'total_volume': int(df['volume'].sum()),
             'avg_volume': int(df['volume'].mean()),
             'median_volume': int(df['volume'].median()),
+            'total_traffic': int(df['traffic'].sum()),
+            'avg_traffic': int(df['traffic'].mean()),
+            'keyword_types': df['keyword_type'].value_counts().to_dict() if 'keyword_type' in df.columns else {},
+            'sources': df['source'].value_counts().to_dict() if 'source' in df.columns else {}
         }
-        
-        # Añadir stats de traffic solo si existe
-        if 'traffic' in df.columns:
-            stats['total_traffic'] = int(df['traffic'].sum())
-            stats['avg_traffic'] = int(df['traffic'].mean())
-        
-        # Añadir keyword types solo si existe
-        if 'keyword_type' in df.columns:
-            stats['keyword_types'] = df['keyword_type'].value_counts().to_dict()
-        
-        # Añadir sources solo si existe
-        if 'source' in df.columns:
-            stats['sources'] = df['source'].value_counts().to_dict()
         
         return stats
     
