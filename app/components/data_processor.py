@@ -72,14 +72,14 @@ class DataProcessor:
                 # Normalizar columnas
                 df = self._normalize_columns(df)
                 
-                # Validar que tiene las columnas mínimas necesarias
-                if 'keyword' not in df.columns:
-                    errors.append(f"{file.name}: No se encontró columna de keywords")
-                    continue
+                # Validar que tiene las columnas REQUERIDAS
+                required = ['keyword', 'volume', 'difficulty', 'cpc']
+                missing = [col for col in required if col not in df.columns or df[col].isnull().all()]
                 
-                if 'volume' not in df.columns:
-                    st.warning(f"  ⚠️ {file.name}: No tiene columna de volumen, se usará valor 0")
-                    df['volume'] = 0
+                if missing:
+                    errors.append(f"{file.name}: Faltan columnas requeridas: {', '.join(missing)}")
+                    st.error(f"  ❌ Faltan columnas requeridas: {', '.join(missing)}")
+                    continue
                 
                 # Validar y limpiar datos
                 df = self._clean_data(df)
@@ -113,17 +113,23 @@ class DataProcessor:
         
         # Verificar que se procesó al menos un archivo
         if not all_dataframes:
-            # Mensaje de error más descriptivo
             error_detail = "\n".join(errors) if errors else "Formato de archivo no compatible"
             raise ValueError(
-                f"No se pudo procesar ningún archivo.\n\n"
-                f"Posibles causas:\n"
-                f"1. El archivo no tiene columnas 'keyword' o 'volume'\n"
-                f"2. El formato no es CSV o Excel válido\n"
-                f"3. El archivo está vacío\n\n"
-                f"Detalles:\n{error_detail}\n\n"
-                f"💡 Tip: Asegúrate de que tu archivo tiene al menos una columna llamada "
-                f"'Keyword' o 'keyword' y opcionalmente 'Volume' o 'volume'"
+                f"❌ No se pudo procesar ningún archivo.\n\n"
+                f"📋 **Columnas REQUERIDAS:**\n"
+                f"  • keyword (o 'Keyword', 'query', 'term')\n"
+                f"  • volume (o 'Volume', 'Search Volume', 'searches')\n"
+                f"  • difficulty (o 'Difficulty', 'KD', '0-100')\n"
+                f"  • cpc (o 'CPC', 'Cost Per Click')\n\n"
+                f"📝 **Formato mínimo esperado:**\n"
+                f"  keyword,volume,difficulty,cpc\n"
+                f"  seo tools,10000,67,2.45\n"
+                f"  keyword research,8000,63,1.85\n\n"
+                f"🔍 **Errores detectados:**\n{error_detail}\n\n"
+                f"💡 **Solución:**\n"
+                f"  1. Verifica que tu archivo tiene estas 4 columnas\n"
+                f"  2. Usa el script de diagnóstico: python test_file_format.py tu_archivo.csv\n"
+                f"  3. Prueba con el archivo de ejemplo: data/examples/keywords_example.csv"
             )
         
         # Combinar todos los dataframes
@@ -181,47 +187,72 @@ class DataProcessor:
         
         df = df.rename(columns=rename_dict)
         
-        # Asegurar columnas mínimas necesarias
-        required_columns = ['keyword']
+        # Asegurar columnas REQUERIDAS
+        required_columns = {
+            'keyword': ['keyword', 'query', 'kw', 'term', 'search_term'],
+            'volume': ['volume', 'search_volume', 'monthly_volume', 'searches'],
+            'difficulty': ['difficulty', 'kd', 'keyword_difficulty', 'competition'],
+            'cpc': ['cpc', 'cost_per_click', 'avg_cpc']
+        }
         
-        for req_col in required_columns:
+        for req_col, possible_names in required_columns.items():
             if req_col not in df.columns:
-                # Intentar inferir
-                if req_col == 'keyword':
-                    # Buscar la primera columna de texto que no sea URL
+                # Intentar encontrar columna equivalente
+                found = False
+                for possible_name in possible_names:
                     for col in df.columns:
-                        if df[col].dtype == 'object' and not col.startswith('url'):
-                            df['keyword'] = df[col]
-                            st.info(f"  ℹ️ Usando columna '{col}' como keywords")
+                        if col.lower() == possible_name.lower():
+                            df[req_col] = df[col]
+                            st.info(f"  ℹ️ Usando columna '{col}' como '{req_col}'")
+                            found = True
                             break
+                    if found:
+                        break
+                
+                # Si no se encontró, buscar por contenido parcial
+                if not found:
+                    for possible_name in possible_names:
+                        for col in df.columns:
+                            if possible_name.lower() in col.lower():
+                                df[req_col] = df[col]
+                                st.info(f"  ℹ️ Usando columna '{col}' como '{req_col}'")
+                                found = True
+                                break
+                        if found:
+                            break
+                
+                # Si aún no se encontró, valores por defecto según el tipo
+                if not found:
+                    if req_col == 'keyword':
+                        # Buscar la primera columna de texto
+                        for col in df.columns:
+                            if df[col].dtype == 'object':
+                                df['keyword'] = df[col]
+                                st.warning(f"  ⚠️ Usando columna '{col}' como keywords")
+                                found = True
+                                break
+                    elif req_col == 'volume':
+                        # Buscar columna numérica más grande
+                        numeric_cols = df.select_dtypes(include=[np.number]).columns
+                        if len(numeric_cols) > 0:
+                            df['volume'] = df[numeric_cols[0]]
+                            st.warning(f"  ⚠️ Usando columna '{numeric_cols[0]}' como volumen")
+                            found = True
+                        else:
+                            st.error(f"  ❌ No se encontró columna de volumen. REQUERIDA.")
+                            df['volume'] = 0
+                    elif req_col == 'difficulty':
+                        st.error(f"  ❌ No se encontró columna de difficulty. REQUERIDA.")
+                        df['difficulty'] = 50  # Valor medio por defecto
+                    elif req_col == 'cpc':
+                        st.error(f"  ❌ No se encontró columna de CPC. REQUERIDA.")
+                        df['cpc'] = 0
         
-        # Añadir columnas opcionales si no existen
-        if 'volume' not in df.columns:
-            # Buscar columnas numéricas que puedan ser volumen
-            for col in df.columns:
-                if 'volume' in col.lower() or 'search' in col.lower():
-                    df['volume'] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-                    st.info(f"  ℹ️ Usando columna '{col}' como volumen")
-                    break
-            
-            # Si no se encontró, usar columna numérica más grande
-            if 'volume' not in df.columns:
-                numeric_cols = df.select_dtypes(include=[np.number]).columns
-                if len(numeric_cols) > 0:
-                    df['volume'] = df[numeric_cols[0]]
-                    st.info(f"  ℹ️ Usando columna '{numeric_cols[0]}' como volumen")
-                else:
-                    df['volume'] = 0
-        
+        # Columnas opcionales
         if 'traffic' not in df.columns:
-            # Estimar tráfico como % del volumen
+            # Estimar tráfico como % del volumen (CTR aproximado del 30%)
             df['traffic'] = df['volume'] * 0.3
-        
-        if 'difficulty' not in df.columns:
-            df['difficulty'] = 50
-        
-        if 'cpc' not in df.columns:
-            df['cpc'] = 0
+            st.info(f"  ℹ️ Tráfico estimado como 30% del volumen")
         
         return df
     
@@ -244,6 +275,14 @@ class DataProcessor:
         
         # Convertir tráfico a numérico
         df['traffic'] = pd.to_numeric(df['traffic'], errors='coerce').fillna(0).astype(int)
+        
+        # Convertir difficulty a numérico y normalizar a 0-100
+        df['difficulty'] = pd.to_numeric(df['difficulty'], errors='coerce').fillna(50)
+        # Asegurar que está entre 0 y 100
+        df['difficulty'] = df['difficulty'].clip(0, 100).astype(int)
+        
+        # Convertir CPC a numérico
+        df['cpc'] = pd.to_numeric(df['cpc'], errors='coerce').fillna(0).astype(float)
         
         # Eliminar keywords con volumen negativo
         df = df[df['volume'] >= 0]
