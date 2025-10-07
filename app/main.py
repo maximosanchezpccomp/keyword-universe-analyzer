@@ -1201,7 +1201,6 @@ https://example.com/specific-page.html""",
         
         if st.session_state.keyword_universe is None:
             st.info("🧠 Primero realiza el análisis con Claude")
-            return
         
         col1, col2 = st.columns(2)
         
