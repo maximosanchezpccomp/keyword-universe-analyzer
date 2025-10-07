@@ -2,6 +2,7 @@ import requests
 import pandas as pd
 from typing import List, Dict, Optional
 import time
+from urllib.parse import urlparse
 
 class SemrushService:
     """Servicio para interactuar con la API de Semrush"""
@@ -13,33 +14,90 @@ class SemrushService:
         self.session = requests.Session()
         self.session.params = {'key': self.api_key}
     
+    def _detect_target_type(self, target: str) -> tuple:
+        """
+        Detecta si el target es un dominio, directorio o URL específica
+        
+        Returns:
+            tuple: (tipo, target_limpio)
+            - tipo: 'domain', 'directory', 'url'
+            - target_limpio: URL normalizada
+        """
+        # Limpiar el target
+        target = target.strip()
+        
+        # Añadir https:// si no tiene protocolo
+        if not target.startswith(('http://', 'https://')):
+            target = f'https://{target}'
+        
+        parsed = urlparse(target)
+        domain = parsed.netloc or parsed.path.split('/')[0]
+        path = parsed.path
+        
+        # Determinar tipo
+        if not path or path == '/':
+            # Dominio raíz: example.com o example.com/
+            return 'domain', domain
+        elif path.endswith('/'):
+            # Directorio: example.com/blog/ o example.com/products/shoes/
+            return 'directory', f'{domain}{path}'
+        else:
+            # URL específica: example.com/blog/post-title
+            return 'url', f'{domain}{path}'
+    
     def get_organic_keywords(
         self, 
-        domain: str, 
+        target: str, 
         limit: int = 1000,
         database: str = "us",
         filter_branded: bool = True
     ) -> pd.DataFrame:
         """
-        Obtiene keywords orgánicas de un dominio desde Semrush
+        Obtiene keywords orgánicas de un dominio, directorio o URL desde Semrush
         
         Args:
-            domain: Dominio a analizar (ej: "example.com")
+            target: Puede ser:
+                - Dominio: "example.com"
+                - Directorio: "example.com/blog/" o "https://example.com/products/"
+                - URL: "example.com/blog/post-title" o "https://example.com/page.html"
             limit: Número máximo de keywords a obtener
             database: Base de datos de Semrush (us, uk, es, etc)
             filter_branded: Filtrar keywords con el nombre del dominio
+        
+        Returns:
+            DataFrame con las keywords encontradas
         """
         
         try:
+            # Detectar tipo de target
+            target_type, normalized_target = self._detect_target_type(target)
+            
+            # Seleccionar tipo de reporte según el target
+            if target_type == 'domain':
+                report_type = 'domain_organic'
+                target_param = normalized_target
+            else:
+                # Para URLs y directorios usa url_organic
+                report_type = 'url_organic'
+                target_param = normalized_target
+            
+            # Log del análisis
+            print(f"📊 Analizando {target_type}: {normalized_target}")
+            
             # Construir parámetros
             params = {
-                'type': 'domain_organic',
-                'domain': domain,
-                'database': database,
+                'type': report_type,
                 'display_limit': limit,
                 'export_columns': 'Ph,Po,Pp,Pd,Nq,Cp,Ur,Tr,Tc,Co,Nr,Td',
-                'display_sort': 'tr_desc'  # Ordenar por tráfico descendente
+                'display_sort': 'tr_desc',  # Ordenar por tráfico descendente
+                'database': database
             }
+            
+            # Añadir el target según el tipo
+            if target_type == 'domain':
+                params['domain'] = target_param
+            else:
+                params['url'] = target_param
             
             # Hacer request
             response = self.session.get(self.BASE_URL, params=params)
@@ -49,7 +107,7 @@ class SemrushService:
             lines = response.text.strip().split('\n')
             
             if len(lines) < 2:
-                raise ValueError(f"No se encontraron datos para {domain}")
+                raise ValueError(f"No se encontraron datos para {target}")
             
             # Separar header y datos
             header = lines[0].split(';')
@@ -87,11 +145,13 @@ class SemrushService:
             
             # Filtrar keywords branded si se solicita
             if filter_branded:
-                domain_name = domain.split('.')[0].lower()
-                df = df[~df['keyword'].str.lower().str.contains(domain_name)]
+                # Extraer el dominio base para filtrar
+                domain_base = normalized_target.split('/')[0].split('.')[0].lower()
+                df = df[~df['keyword'].str.lower().str.contains(domain_base)]
             
             # Añadir metadata
-            df['source'] = domain
+            df['source'] = target
+            df['source_type'] = target_type
             df['database'] = database
             
             return df
@@ -234,36 +294,94 @@ class SemrushService:
     
     def batch_get_keywords(
         self, 
-        domains: List[str], 
+        targets: List[str], 
         limit: int = 1000,
         delay: float = 1.0
     ) -> pd.DataFrame:
         """
-        Obtiene keywords de múltiples dominios con rate limiting
+        Obtiene keywords de múltiples targets (dominios, directorios o URLs) con rate limiting
         
         Args:
-            domains: Lista de dominios
-            limit: Keywords por dominio
+            targets: Lista de targets (pueden ser dominios, directorios o URLs mezclados)
+            limit: Keywords por target
             delay: Delay entre requests en segundos
         """
         
         all_keywords = []
         
-        for domain in domains:
+        for target in targets:
             try:
-                print(f"Obteniendo keywords de {domain}...")
-                keywords = self.get_organic_keywords(domain, limit=limit)
-                all_keywords.append(keywords)
-                print(f"✓ {domain}: {len(keywords)} keywords")
+                # Detectar tipo para mejor logging
+                target_type, normalized = self._detect_target_type(target)
+                
+                print(f"🔍 Obteniendo keywords de {target_type}: {target}...")
+                keywords = self.get_organic_keywords(target, limit=limit)
+                
+                if not keywords.empty:
+                    all_keywords.append(keywords)
+                    print(f"✓ {target}: {len(keywords)} keywords obtenidas")
+                else:
+                    print(f"⚠️  {target}: No se encontraron keywords")
                 
                 # Rate limiting
                 time.sleep(delay)
                 
             except Exception as e:
-                print(f"✗ Error con {domain}: {str(e)}")
+                print(f"✗ Error con {target}: {str(e)}")
                 continue
         
         if not all_keywords:
             return pd.DataFrame()
         
         return pd.concat(all_keywords, ignore_index=True)
+    
+    def compare_urls(
+        self,
+        url1: str,
+        url2: str,
+        database: str = "us"
+    ) -> Dict:
+        """
+        Compara dos URLs para ver keywords comunes y únicas
+        
+        Args:
+            url1: Primera URL
+            url2: Segunda URL
+            database: Base de datos de Semrush
+        
+        Returns:
+            Diccionario con análisis comparativo
+        """
+        
+        try:
+            print(f"📊 Comparando URLs...")
+            
+            # Obtener keywords de ambas URLs
+            kw1 = self.get_organic_keywords(url1, limit=10000, database=database)
+            kw2 = self.get_organic_keywords(url2, limit=10000, database=database)
+            
+            # Keywords únicas y comunes
+            keywords1 = set(kw1['keyword'].tolist())
+            keywords2 = set(kw2['keyword'].tolist())
+            
+            common = keywords1.intersection(keywords2)
+            unique1 = keywords1 - keywords2
+            unique2 = keywords2 - keywords1
+            
+            return {
+                'url1': url1,
+                'url2': url2,
+                'url1_keywords': len(keywords1),
+                'url2_keywords': len(keywords2),
+                'common_keywords': len(common),
+                'unique_to_url1': len(unique1),
+                'unique_to_url2': len(unique2),
+                'overlap_percentage': (len(common) / len(keywords1) * 100) if keywords1 else 0,
+                'common_keywords_list': list(common)[:50],  # Top 50
+                'unique_to_url1_list': list(unique1)[:50],
+                'unique_to_url2_list': list(unique2)[:50]
+            }
+            
+        except Exception as e:
+            print(f"Error comparando URLs: {str(e)}")
+            return {}
