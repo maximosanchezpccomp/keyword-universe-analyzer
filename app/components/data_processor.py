@@ -77,6 +77,17 @@ class DataProcessor:
         
         # Calcular métricas adicionales
         combined_df = self._calculate_metrics(combined_df)
+    
+    if 'traffic' not in combined_df.columns:
+        # Estimar tráfico como ~30% del volumen (CTR promedio estimado)
+        combined_df['traffic'] = (combined_df['volume'] * 0.3).astype(int)
+        print("⚠️ Columna 'traffic' no encontrada. Estimada basada en volumen.")
+    
+    # Validar que traffic no tenga valores nulos
+    if combined_df['traffic'].isnull().any():
+        combined_df['traffic'] = combined_df['traffic'].fillna(
+            (combined_df['volume'] * 0.3).astype(int)
+        )
         
         return combined_df
     
