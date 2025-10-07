@@ -23,8 +23,13 @@ class AnthropicService:
     ) -> str:
         """Crea el prompt optimizado para analizar keywords"""
         
+        # ARREGLO: Seleccionar solo columnas disponibles
+        columns_to_use = ['keyword', 'volume']
+        if 'traffic' in df.columns:
+            columns_to_use.append('traffic')
+        
         # Preparar datos de keywords (top por volumen)
-        top_keywords = df.nlargest(1000, 'volume')[['keyword', 'volume', 'traffic']].to_dict('records')
+        top_keywords = df.nlargest(1000, 'volume')[columns_to_use].to_dict('records')
         
         # Crear resumen estadístico
         stats = {
@@ -34,6 +39,11 @@ class AnthropicService:
             'unique_keywords': df['keyword'].nunique()
         }
         
+        # Añadir stats de traffic si existe
+        if 'traffic' in df.columns:
+            stats['total_traffic'] = int(df['traffic'].sum())
+            stats['avg_traffic'] = int(df['traffic'].mean())
+        
         prompt = f"""Eres un experto en SEO y análisis de keywords. Tu tarea es crear un "Keyword Universe" completo y estratégico.
 
 # DATOS PROPORCIONADOS
@@ -41,6 +51,7 @@ class AnthropicService:
 - Volumen total de búsqueda: {stats['total_volume']:,}
 - Volumen promedio: {stats['avg_volume']:,}
 - Keywords únicas: {stats['unique_keywords']:,}
+{f"- Tráfico total: {stats['total_traffic']:,}" if 'total_traffic' in stats else ""}
 
 # TIPO DE ANÁLISIS
 {analysis_type}
@@ -145,7 +156,13 @@ IMPORTANTE: Responde SOLO con el JSON, sin texto adicional antes o después."""
                 # Asegurar que todos los campos numéricos sean int/float
                 topic['keyword_count'] = int(topic.get('keyword_count', 0))
                 topic['volume'] = int(topic.get('volume', 0))
-                topic['traffic'] = int(topic.get('traffic', 0))
+                
+                # Traffic puede no existir si la columna no estaba en el DF original
+                if 'traffic' not in topic:
+                    # Estimar basado en volumen
+                    topic['traffic'] = int(topic['volume'] * 0.3)
+                else:
+                    topic['traffic'] = int(topic.get('traffic', 0))
                 
                 # Calcular métricas adicionales
                 if topic['keyword_count'] > 0:
@@ -158,6 +175,13 @@ IMPORTANTE: Responde SOLO con el JSON, sin texto adicional antes o después."""
     def get_topic_details(self, topic_name: str, df: pd.DataFrame) -> pd.DataFrame:
         """Obtiene las keywords específicas de un topic usando Claude"""
         
+        # Preparar datos de forma segura
+        columns_to_use = ['keyword', 'volume']
+        if 'traffic' in df.columns:
+            columns_to_use.append('traffic')
+        
+        sample_data = df[columns_to_use].head(500).to_json(orient='records')
+        
         prompt = f"""Dado el topic "{topic_name}", identifica qué keywords del siguiente dataset pertenecen a este topic.
 
 Responde SOLO con un JSON con esta estructura:
@@ -166,7 +190,7 @@ Responde SOLO con un JSON con esta estructura:
 }}
 
 Dataset:
-{df[['keyword', 'volume']].head(500).to_json(orient='records')}
+{sample_data}
 """
         
         try:
