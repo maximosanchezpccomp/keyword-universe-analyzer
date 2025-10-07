@@ -23,7 +23,7 @@ class AnthropicService:
     ) -> str:
         """Crea el prompt optimizado para analizar keywords"""
         
-        # ARREGLO: Seleccionar solo columnas disponibles
+        # Seleccionar solo columnas disponibles
         columns_to_use = ['keyword', 'volume']
         if 'traffic' in df.columns:
             columns_to_use.append('traffic')
@@ -44,14 +44,57 @@ class AnthropicService:
             stats['total_traffic'] = int(df['traffic'].sum())
             stats['avg_traffic'] = int(df['traffic'].mean())
         
+        # ARREGLO: Construir secciones opcionales ANTES del f-string
+        gaps_section = ""
+        if include_gaps:
+            gaps_section = """,
+    "gaps": [
+        {
+            "topic": "Nombre del gap/oportunidad",
+            "volume": 50000,
+            "description": "Por qué es una oportunidad",
+            "difficulty": "medium"
+        }
+    ]"""
+        
+        trends_section = ""
+        if include_trends:
+            trends_section = """,
+    "trends": [
+        {
+            "trend": "Nombre de la tendencia",
+            "keywords": ["keyword1", "keyword2"],
+            "insight": "Insight sobre la tendencia"
+        }
+    ]"""
+        
+        # Instrucciones adicionales
+        extra_instructions = ""
+        if custom_instructions:
+            extra_instructions = f"\n5. {custom_instructions}"
+        
+        if include_semantic:
+            extra_instructions += "\n6. Realiza análisis semántico profundo para entender intención real del usuario"
+        
+        if include_trends:
+            extra_instructions += "\n7. Identifica tendencias emergentes y keywords en crecimiento"
+        
+        if include_gaps:
+            extra_instructions += "\n8. Detecta gaps de contenido: topics con alto volumen pero poca cobertura competitiva"
+        
+        # Formatear stats de traffic si existe
+        traffic_stats = ""
+        if 'total_traffic' in stats:
+            traffic_stats = f"\n- Tráfico total: {stats['total_traffic']:,}"
+        
+        # Construir el prompt
         prompt = f"""Eres un experto en SEO y análisis de keywords. Tu tarea es crear un "Keyword Universe" completo y estratégico.
 
 # DATOS PROPORCIONADOS
 - Total de keywords: {stats['total_keywords']:,}
 - Volumen total de búsqueda: {stats['total_volume']:,}
 - Volumen promedio: {stats['avg_volume']:,}
-- Keywords únicas: {stats['unique_keywords']:,}
-{f"- Tráfico total: {stats['total_traffic']:,}" if 'total_traffic' in stats else ""}
+- Keywords únicas: {stats['unique_keywords']:,}{traffic_stats}
 
 # TIPO DE ANÁLISIS
 {analysis_type}
@@ -77,33 +120,14 @@ Debes responder ÚNICAMENTE con un JSON válido con esta estructura exacta:
             "description": "Descripción del topic y por qué es importante",
             "example_keywords": ["keyword1", "keyword2", "keyword3"]
         }}
-    ],
-    {"gaps": [" if include_gaps else ""}
-        {{
-            "topic": "Nombre del gap/oportunidad",
-            "volume": 50000,
-            "description": "Por qué es una oportunidad",
-            "difficulty": "medium"
-        }}
-    ]{"," if include_gaps else ""}
-    {"trends": [" if include_trends else ""}
-        {{
-            "trend": "Nombre de la tendencia",
-            "keywords": ["keyword1", "keyword2"],
-            "insight": "Insight sobre la tendencia"
-        }}
-    ]{"}}" if include_trends else ""}
+    ]{gaps_section}{trends_section}
 }}
 
 # INSTRUCCIONES ESPECÍFICAS
 1. Agrupa keywords por tema semántico y relevancia
 2. Calcula el volumen total y número de keywords por topic
 3. Asigna tiers basándote en: volumen, competencia y oportunidad estratégica
-4. Identifica 5-10 topics principales por tier
-{f"5. {custom_instructions}" if custom_instructions else ""}
-{"6. Realiza análisis semántico profundo para entender intención real del usuario" if include_semantic else ""}
-{"7. Identifica tendencias emergentes y keywords en crecimiento" if include_trends else ""}
-{"8. Detecta gaps de contenido: topics con alto volumen pero poca cobertura competitiva" if include_gaps else ""}
+4. Identifica 5-10 topics principales por tier{extra_instructions}
 
 # KEYWORDS A ANALIZAR (TOP 1000 POR VOLUMEN)
 {json.dumps(top_keywords[:1000], indent=2)}
