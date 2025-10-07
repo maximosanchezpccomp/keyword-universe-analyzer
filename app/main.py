@@ -741,41 +741,173 @@ def main():
                         except Exception as e:
                             st.error(f"Error al leer el archivo: {str(e)}")
         
-        with col2:
-            # Opción 2: Integración directa con Semrush
-            st.subheader("Opción 2: Semrush API")
+with col2:
+    # Opción 2: Integración directa con Semrush
+    st.subheader("Opción 2: Semrush API")
+    
+    if semrush_key:
+        st.info("💡 **Puedes analizar:**\n- Dominios: `example.com`\n- Directorios: `example.com/blog/`\n- URLs: `example.com/page.html`")
+        
+        # Tabs para diferentes tipos de análisis
+        semrush_tab1, semrush_tab2 = st.tabs(["📊 Análisis Múltiple", "🔍 Comparar URLs"])
+        
+        with semrush_tab1:
+            competitor_targets = st.text_area(
+                "Targets a analizar (uno por línea)",
+                placeholder="""example.com
+competitor.com/blog/
+competitor.com/products/category/
+https://example.com/specific-page.html""",
+                height=150,
+                help="Puedes mezclar dominios, directorios y URLs específicas"
+            )
             
-            if semrush_key:
-                competitor_domains = st.text_area(
-                    "Dominios competidores (uno por línea)",
-                    placeholder="example.com\ncompetitor.com",
-                    height=150
+            col2a, col2b = st.columns(2)
+            with col2a:
+                semrush_limit = st.number_input(
+                    "Keywords por target",
+                    min_value=100,
+                    max_value=10000,
+                    value=1000,
+                    step=100
                 )
-                
-                if st.button("🔍 Obtener Keywords", type="primary"):
-                    if competitor_domains:
-                        domains = [d.strip() for d in competitor_domains.split('\n') if d.strip()]
+            with col2b:
+                semrush_database = st.selectbox(
+                    "Base de datos",
+                    ["us", "uk", "es", "de", "fr", "it", "br", "mx", "ar"],
+                    help="País/idioma de la base de datos"
+                )
+            
+            if st.button("🔍 Obtener Keywords", type="primary", key="semrush_analyze"):
+                if competitor_targets:
+                    targets = [t.strip() for t in competitor_targets.split('\n') if t.strip()]
+                    
+                    with st.spinner(f"Obteniendo datos de Semrush ({len(targets)} targets)..."):
+                        semrush = SemrushService(semrush_key)
+                        all_data = []
                         
-                        with st.spinner("Obteniendo datos de Semrush..."):
-                            semrush = SemrushService(semrush_key)
-                            all_data = []
-                            
-                            progress_bar = st.progress(0)
-                            for i, domain in enumerate(domains):
-                                try:
-                                    data = semrush.get_organic_keywords(domain, limit=max_keywords)
-                                    all_data.append(data)
-                                    st.success(f"✅ {domain}: {len(data)} keywords")
-                                except Exception as e:
-                                    st.error(f"❌ Error con {domain}: {str(e)}")
+                        progress_bar = st.progress(0)
+                        status_text = st.empty()
+                        
+                        for i, target in enumerate(targets):
+                            try:
+                                status_text.text(f"🔍 Analizando: {target}")
+                                data = semrush.get_organic_keywords(
+                                    target, 
+                                    limit=semrush_limit,
+                                    database=semrush_database
+                                )
                                 
-                                progress_bar.progress((i + 1) / len(domains))
+                                if not data.empty:
+                                    all_data.append(data)
+                                    st.success(f"✅ {target}: {len(data)} keywords ({data['source_type'].iloc[0]})")
+                                else:
+                                    st.warning(f"⚠️ {target}: No se encontraron keywords")
+                                    
+                            except Exception as e:
+                                st.error(f"❌ Error con {target}: {str(e)}")
                             
-                            if all_data:
-                                st.session_state.processed_data = pd.concat(all_data, ignore_index=True)
-                                st.success(f"🎉 Total: {len(st.session_state.processed_data)} keywords obtenidas")
-            else:
-                st.warning("⚠️ Ingresa tu API key de Semrush")
+                            progress_bar.progress((i + 1) / len(targets))
+                        
+                        status_text.empty()
+                        
+                        if all_data:
+                            st.session_state.processed_data = pd.concat(all_data, ignore_index=True)
+                            
+                            # Mostrar resumen por tipo
+                            st.divider()
+                            st.subheader("📊 Resumen del Análisis")
+                            
+                            col_r1, col_r2, col_r3 = st.columns(3)
+                            with col_r1:
+                                st.metric("Total Keywords", f"{len(st.session_state.processed_data):,}")
+                            with col_r2:
+                                st.metric("Volumen Total", f"{st.session_state.processed_data['volume'].sum():,.0f}")
+                            with col_r3:
+                                unique_sources = st.session_state.processed_data['source'].nunique()
+                                st.metric("Targets Analizados", unique_sources)
+                            
+                            # Tabla de resumen por target
+                            if 'source' in st.session_state.processed_data.columns:
+                                st.subheader("📋 Detalle por Target")
+                                summary = st.session_state.processed_data.groupby(['source', 'source_type']).agg({
+                                    'keyword': 'count',
+                                    'volume': 'sum',
+                                    'traffic': 'sum'
+                                }).reset_index()
+                                summary.columns = ['Target', 'Tipo', 'Keywords', 'Volumen', 'Tráfico']
+                                st.dataframe(summary, use_container_width=True)
+                            
+                            st.success(f"🎉 Total: {len(st.session_state.processed_data):,} keywords obtenidas")
+                        else:
+                            st.error("❌ No se pudieron obtener keywords de ningún target")
+                else:
+                    st.warning("⚠️ Ingresa al menos un target")
+        
+        with semrush_tab2:
+            st.markdown("**Compara dos URLs/directorios para ver keywords comunes y únicas**")
+            
+            url1 = st.text_input(
+                "URL/Directorio 1",
+                placeholder="example.com/blog/",
+                help="Puede ser dominio, directorio o URL"
+            )
+            
+            url2 = st.text_input(
+                "URL/Directorio 2",
+                placeholder="competitor.com/blog/",
+                help="Puede ser dominio, directorio o URL"
+            )
+            
+            if st.button("🔄 Comparar", type="primary", key="compare_urls"):
+                if url1 and url2:
+                    with st.spinner("Comparando URLs..."):
+                        semrush = SemrushService(semrush_key)
+                        comparison = semrush.compare_urls(url1, url2, database=semrush_database)
+                        
+                        if comparison:
+                            st.success("✅ Comparación completada")
+                            
+                            # Métricas principales
+                            col_c1, col_c2, col_c3 = st.columns(3)
+                            with col_c1:
+                                st.metric("Keywords Comunes", f"{comparison['common_keywords']:,}")
+                            with col_c2:
+                                st.metric(f"Únicas en URL 1", f"{comparison['unique_to_url1']:,}")
+                            with col_c3:
+                                st.metric(f"Únicas en URL 2", f"{comparison['unique_to_url2']:,}")
+                            
+                            # Overlap
+                            st.metric("Overlap", f"{comparison['overlap_percentage']:.1f}%")
+                            
+                            # Keywords comunes
+                            if comparison['common_keywords_list']:
+                                with st.expander("📊 Keywords Comunes (Top 50)"):
+                                    st.write(", ".join(comparison['common_keywords_list']))
+                            
+                            # Keywords únicas
+                            col_u1, col_u2 = st.columns(2)
+                            with col_u1:
+                                if comparison['unique_to_url1_list']:
+                                    with st.expander(f"🔵 Únicas en {url1} (Top 50)"):
+                                        st.write(", ".join(comparison['unique_to_url1_list']))
+                            
+                            with col_u2:
+                                if comparison['unique_to_url2_list']:
+                                    with st.expander(f"🔴 Únicas en {url2} (Top 50)"):
+                                        st.write(", ".join(comparison['unique_to_url2_list']))
+                        else:
+                            st.error("❌ Error al comparar URLs")
+                else:
+                    st.warning("⚠️ Ingresa ambas URLs")
+    else:
+        st.warning("⚠️ Ingresa tu API key de Semrush en la barra lateral")
+        st.info("**💡 Con Semrush API puedes:**\n"
+               "- Analizar dominios completos\n"
+               "- Analizar directorios específicos\n"
+               "- Analizar URLs individuales\n"
+               "- Comparar dos URLs\n\n"
+               "Obtén tu API key en: https://www.semrush.com/api-analytics/")
     
     # TAB 2: Análisis con IA
     with tab2:
