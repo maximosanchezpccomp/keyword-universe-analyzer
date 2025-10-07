@@ -28,8 +28,13 @@ class OpenAIService:
     ) -> List[Dict[str, str]]:
         """Crea los mensajes para OpenAI en formato chat"""
         
+        # ARREGLO: Seleccionar solo columnas disponibles
+        columns_to_use = ['keyword', 'volume']
+        if 'traffic' in df.columns:
+            columns_to_use.append('traffic')
+        
         # Preparar datos
-        top_keywords = df.nlargest(1000, 'volume')[['keyword', 'volume', 'traffic']].to_dict('records')
+        top_keywords = df.nlargest(1000, 'volume')[columns_to_use].to_dict('records')
         
         stats = {
             'total_keywords': len(df),
@@ -37,6 +42,11 @@ class OpenAIService:
             'avg_volume': int(df['volume'].mean()),
             'unique_keywords': df['keyword'].nunique()
         }
+        
+        # Añadir traffic stats si existe
+        if 'traffic' in df.columns:
+            stats['total_traffic'] = int(df['traffic'].sum())
+            stats['avg_traffic'] = int(df['traffic'].mean())
         
         # Determinar tipo de análisis
         analysis_instructions = self._get_analysis_instructions(analysis_type)
@@ -78,6 +88,7 @@ Siempre respondes con JSON válido y análisis profundos."""
 - Volumen total: {stats['total_volume']:,}
 - Volumen promedio: {stats['avg_volume']:,}
 - Keywords únicas: {stats['unique_keywords']:,}
+{f"- Tráfico total: {stats.get('total_traffic', 'N/A'):,}" if 'total_traffic' in stats else ""}
 
 # TIPO DE ANÁLISIS
 {analysis_type}
@@ -195,7 +206,13 @@ Asigna tiers considerando el valor estratégico de cada etapa."""
                 # Asegurar tipos correctos
                 topic['keyword_count'] = int(topic.get('keyword_count', 0))
                 topic['volume'] = int(topic.get('volume', 0))
-                topic['traffic'] = int(topic.get('traffic', 0))
+                
+                # Traffic puede no existir en el resultado de la IA
+                if 'traffic' not in topic and 'traffic' in df.columns:
+                    # Estimar basado en volumen
+                    topic['traffic'] = int(topic['volume'] * 0.3)
+                else:
+                    topic['traffic'] = int(topic.get('traffic', topic['volume'] * 0.3))
                 
                 # Calcular métricas adicionales
                 if topic['keyword_count'] > 0:
@@ -224,6 +241,13 @@ Asigna tiers considerando el valor estratégico de cada etapa."""
             Análisis comparativo y recomendaciones
         """
         
+        # Preparar datos de forma segura
+        columns_to_use = ['keyword', 'volume']
+        if 'traffic' in df.columns:
+            columns_to_use.append('traffic')
+        
+        sample_data = df.nlargest(200, 'volume')[columns_to_use].to_dict('records')
+        
         messages = [
             {
                 "role": "system",
@@ -242,7 +266,7 @@ ANÁLISIS A REVISAR:
 {json.dumps(claude_result.get('topics', [])[:20], indent=2)}
 
 KEYWORDS DISPONIBLES (muestra):
-{json.dumps(df.nlargest(200, 'volume')[['keyword', 'volume']].to_dict('records'), indent=2)}
+{json.dumps(sample_data, indent=2)}
 
 Responde en JSON:
 {{
@@ -278,7 +302,12 @@ Responde en JSON:
     def get_topic_details(self, topic_name: str, df: pd.DataFrame) -> pd.DataFrame:
         """Identifica keywords específicas que pertenecen a un topic"""
         
-        sample_keywords = df.nlargest(500, 'volume')[['keyword', 'volume']].to_dict('records')
+        # Preparar datos de forma segura
+        columns_to_use = ['keyword', 'volume']
+        if 'traffic' in df.columns:
+            columns_to_use.append('traffic')
+        
+        sample_keywords = df.nlargest(500, 'volume')[columns_to_use].to_dict('records')
         
         messages = [
             {
