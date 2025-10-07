@@ -12,10 +12,10 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from app.services.anthropic_service import AnthropicService
 from app.services.semrush_service import SemrushService
+from app.services.url_analyzer_service import URLAnalyzerService
 from app.components.data_processor import DataProcessor
 from app.components.visualizer import KeywordVisualizer
 from app.utils.helpers import export_to_excel, calculate_metrics
-from app.services.url_analyzer_service import URLAnalyzerService
 
 # Importar configuración del logo
 try:
@@ -35,7 +35,6 @@ st.set_page_config(
 # CSS personalizado con branding PC Componentes
 st.markdown("""
 <style>
-    /* Colores corporativos PC Componentes */
     :root {
         --pc-orange: #FF6000;
         --pc-orange-light: #FF8640;
@@ -48,7 +47,6 @@ st.markdown("""
         --pc-white: #FFFFFF;
     }
     
-    /* Header principal */
     .main-header {
         font-size: 2.5rem;
         font-weight: 800;
@@ -68,19 +66,6 @@ st.markdown("""
         opacity: 0.9;
     }
     
-    /* Logo container */
-    .logo-container {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-        padding: 1rem;
-        background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
-        border-radius: 12px;
-        border-left: 4px solid #FF6000;
-    }
-    
-    /* Botones primarios */
     .stButton > button {
         background: linear-gradient(135deg, #FF6000 0%, #FF8640 100%);
         color: white;
@@ -98,23 +83,6 @@ st.markdown("""
         transform: translateY(-1px);
     }
     
-    /* Tarjetas de métricas */
-    .metric-card {
-        background: linear-gradient(135deg, #FFFFFF 0%, #F9F9F9 100%);
-        padding: 1.2rem;
-        border-radius: 12px;
-        border-left: 4px solid #FF6000;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        margin-bottom: 1rem;
-        transition: all 0.3s ease;
-    }
-    
-    .metric-card:hover {
-        box-shadow: 0 4px 16px rgba(255, 96, 0, 0.15);
-        transform: translateY(-2px);
-    }
-    
-    /* SIDEBAR */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #170453 0%, #090029 100%) !important;
     }
@@ -122,8 +90,7 @@ st.markdown("""
     [data-testid="stSidebar"],
     [data-testid="stSidebar"] *,
     [data-testid="stSidebar"] > div,
-    [data-testid="stSidebar"] section,
-    [data-testid="stSidebar"] [class*="css"] {
+    [data-testid="stSidebar"] section {
         background-color: transparent !important;
     }
     
@@ -134,10 +101,8 @@ st.markdown("""
     [data-testid="stSidebar"] label {
         color: #FFB380 !important;
         font-weight: 600 !important;
-        font-size: 0.95rem !important;
     }
     
-    /* Expanders */
     [data-testid="stSidebar"] .streamlit-expanderHeader {
         background-color: rgba(255, 96, 0, 0.25) !important;
         border-radius: 8px !important;
@@ -147,12 +112,6 @@ st.markdown("""
         padding: 0.75rem 1rem !important;
     }
     
-    [data-testid="stSidebar"] .streamlit-expanderHeader:hover {
-        background-color: rgba(255, 96, 0, 0.35) !important;
-        border-color: rgba(255, 134, 64, 0.6) !important;
-    }
-    
-    /* Text inputs */
     [data-testid="stSidebar"] input[type="text"],
     [data-testid="stSidebar"] input[type="password"],
     [data-testid="stSidebar"] input[type="number"],
@@ -164,19 +123,12 @@ st.markdown("""
         padding: 0.65rem !important;
     }
     
-    /* Selectboxes */
     [data-testid="stSidebar"] .stSelectbox div {
         background-color: #1F0A5C !important;
         border: 1px solid rgba(81, 67, 126, 0.4) !important;
         border-radius: 6px !important;
     }
     
-    [data-testid="stSidebar"] .stSelectbox > div > div:hover {
-        border-color: rgba(81, 67, 126, 0.6) !important;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
-    }
-    
-    /* Tabs */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
         background-color: #F5F5F5;
@@ -205,17 +157,11 @@ st.markdown("""
         border-color: #FF6000;
     }
     
-    /* File uploader */
     [data-testid="stFileUploader"] {
         border: 2px dashed #FF8640;
         border-radius: 10px;
         padding: 2rem;
         background: linear-gradient(135deg, #FFFFFF 0%, #FFF9F5 100%);
-    }
-    
-    [data-testid="stFileUploader"]:hover {
-        border-color: #FF6000;
-        background: #FFF9F5;
     }
     
     h2 {
@@ -260,7 +206,6 @@ def display_logo():
         except:
             pass
     
-    # Fallback
     st.markdown("""
     <div style="background: linear-gradient(135deg, #FF6000 0%, #FF8640 100%); 
                 padding: 1rem; border-radius: 10px; text-align: center;
@@ -287,7 +232,6 @@ def main():
     with st.sidebar:
         st.header("⚙️ Configuración")
         
-        # Selección de proveedor de IA
         with st.expander("🤖 Proveedor de IA", expanded=True):
             ai_provider = st.selectbox(
                 "Selecciona el proveedor de IA",
@@ -295,7 +239,6 @@ def main():
                 help="Claude Sonnet 4.5 es más analítico. GPT-4o es más rápido."
             )
         
-        # API Keys
         with st.expander("🔑 API Keys", expanded=True):
             anthropic_key = None
             openai_key = None
@@ -311,14 +254,12 @@ def main():
             semrush_key = st.text_input("Semrush API Key", type="password",
                                        help="Tu API key de Semrush (opcional)")
         
-        # Configuración del análisis
         with st.expander("🎯 Parámetros de Análisis"):
             max_keywords = st.slider("Máximo de keywords por competidor", 
                                     100, 5000, 1000, 100)
             min_volume = st.number_input("Volumen mínimo de búsqueda", 
                                         min_value=0, value=10)
             
-            # Selección de modelo según proveedor
             model_choice = None
             claude_model = None
             openai_model = None
@@ -333,7 +274,7 @@ def main():
                                             "gpt-4-turbo",
                                             "gpt-4",
                                             "gpt-3.5-turbo"])
-            else:  # Ambos
+            else:
                 col1, col2 = st.columns(2)
                 with col1:
                     claude_model = st.selectbox("Modelo Claude", 
@@ -345,14 +286,14 @@ def main():
                                                 "gpt-4-turbo"])
         
         st.divider()
-        st.info("💡 **Tip:** Sube archivos CSV o Excel de Ahrefs, Semrush o similar con columnas: keyword, volume, traffic")
+        st.info("💡 **Tip:** Sube archivos CSV o Excel de Ahrefs, Semrush o similar")
     
-    # Tabs principales
-    tab1, tab2, tab3, tab4 = st.tabs([
+    # TABS PRINCIPALES - AHORA CON 5 PESTAÑAS
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "📁 Carga de Datos", 
         "🧠 Análisis con IA", 
         "📊 Visualización",
-        "📥 Exportar"
+        "📥 Exportar",
         "🔗 Análisis de URLs"
     ])
     
@@ -427,7 +368,6 @@ def main():
     with tab2:
         st.header("Análisis con IA")
         
-        # Validar API keys según proveedor
         has_valid_keys = True
         
         if ai_provider == "Claude (Anthropic)" and not anthropic_key:
@@ -440,12 +380,10 @@ def main():
             st.warning("⚠️ Para validación cruzada necesitas ambas API keys")
             has_valid_keys = False
         
-        # Solo continuar si hay keys válidas
         if has_valid_keys:
             if not st.session_state.uploaded_files and st.session_state.processed_data is None:
                 st.info("📁 Primero carga datos en la pestaña 'Carga de Datos'")
             else:
-                # Preparar datos
                 if st.session_state.processed_data is None and st.session_state.uploaded_files:
                     processor = DataProcessor()
                     st.session_state.processed_data = processor.process_files(
@@ -456,7 +394,6 @@ def main():
                 if st.session_state.processed_data is not None:
                     df = st.session_state.processed_data
                     
-                    # Métricas rápidas
                     col1, col2, col3, col4 = st.columns(4)
                     with col1:
                         st.metric("Total Keywords", f"{len(df):,}")
@@ -469,7 +406,6 @@ def main():
                     
                     st.divider()
                     
-                    # Configuración del prompt
                     col1, col2 = st.columns([2, 1])
                     
                     with col1:
@@ -495,9 +431,8 @@ def main():
                         include_trends = st.checkbox("Identificar tendencias emergentes", value=True)
                         include_gaps = st.checkbox("Detectar gaps de contenido", value=True)
                     
-                    # Botón de análisis
                     if st.button("🚀 Analizar con IA", type="primary", use_container_width=True):
-                        with st.spinner(f"🧠 {ai_provider.split('(')[0].strip()} está analizando tu universo de keywords..."):
+                        with st.spinner(f"🧠 {ai_provider.split('(')[0].strip()} está analizando..."):
                             try:
                                 if ai_provider == "Claude (Anthropic)":
                                     anthropic_service = AnthropicService(anthropic_key, model_choice)
@@ -535,7 +470,7 @@ def main():
                                     result['provider'] = 'OpenAI'
                                     result['model'] = model_choice
                                     
-                                else:  # Ambos
+                                else:
                                     from app.services.openai_service import OpenAIService
                                     
                                     st.info("1️⃣ Analizando con Claude...")
@@ -595,14 +530,12 @@ def main():
                                 with st.expander("Ver detalles del error"):
                                     st.code(traceback.format_exc())
                     
-                    # Mostrar resultados si existen
                     if st.session_state.keyword_universe:
                         st.divider()
                         st.subheader("📋 Resultados del Análisis")
                         
                         result = st.session_state.keyword_universe
                         
-                        # Mostrar info del proveedor
                         provider_col1, provider_col2 = st.columns(2)
                         with provider_col1:
                             st.metric("Proveedor de IA", result.get('provider', 'N/A'))
@@ -612,11 +545,9 @@ def main():
                             else:
                                 st.metric("Modelo", result.get('model', 'N/A'))
                         
-                        # Resumen ejecutivo
                         with st.expander("📊 Resumen Ejecutivo", expanded=True):
                             st.markdown(result.get('summary', 'No disponible'))
                         
-                        # Validación cruzada
                         if result.get('provider') == 'Ambos' and 'comparison' in result:
                             with st.expander("🔄 Validación Cruzada", expanded=True):
                                 comp = result['comparison']
@@ -624,7 +555,7 @@ def main():
                                 st.info(comp.get('validation', 'N/A'))
                                 
                                 if 'missing_topics' in comp and comp['missing_topics']:
-                                    st.markdown("**Topics Adicionales Sugeridos por OpenAI:**")
+                                    st.markdown("**Topics Adicionales:**")
                                     for topic in comp['missing_topics']:
                                         st.markdown(f"- {topic}")
                                 
@@ -633,9 +564,8 @@ def main():
                                     for improvement in comp['improvements']:
                                         st.markdown(f"- {improvement}")
                         
-                        # Topics
                         if 'topics' in result:
-                            st.subheader("🎯 Topics Identificados (Claude)" if result.get('provider') == 'Ambos' else "🎯 Topics Identificados")
+                            st.subheader("🎯 Topics Identificados")
                             
                             topics_df = pd.DataFrame(result['topics'])
                             
@@ -655,18 +585,13 @@ def main():
                             )
                             
                             st.dataframe(filtered_topics, use_container_width=True, height=400)
-                        
-                        if result.get('provider') == 'Ambos' and 'topics_openai' in result:
-                            st.subheader("🎯 Topics Identificados (OpenAI)")
-                            topics_openai_df = pd.DataFrame(result['topics_openai'])
-                            st.dataframe(topics_openai_df, use_container_width=True, height=400)
     
     # TAB 3: Visualización
     with tab3:
         st.header("Visualización del Keyword Universe")
         
         if st.session_state.keyword_universe is None:
-            st.info("🧠 Primero realiza el análisis con IA en la pestaña anterior")
+            st.info("🧠 Primero realiza el análisis con IA")
         else:
             result = st.session_state.keyword_universe
             
@@ -742,7 +667,7 @@ def main():
                                     file_name=f"keyword_universe_{datetime.now().strftime('%Y%m%d')}.csv",
                                     mime="text/csv"
                                 )
-                            else:  # JSON
+                            else:
                                 import json
                                 json_data = json.dumps(st.session_state.keyword_universe, indent=2)
                                 st.download_button(
@@ -774,417 +699,238 @@ def main():
                     tier_dist = topics_df.groupby('tier').size()
                     for tier, count in tier_dist.items():
                         st.text(f"Tier {tier}: {count} topics")
-
-# TAB 5: Análisis de URLs
-with tab5:
-    st.header("🔗 Análisis de URLs y Directorios")
     
-    st.info("""
-    **Analiza URLs específicas o directorios completos de tu sitio:**
-    - Ver qué keywords rankea cada página
-    - Comparar rendimiento entre directorios
-    - Detectar canibalización de keywords
-    - Auditar contenido de páginas
-    """)
-    
-    # Verificar API key de Semrush
-    if not semrush_key:
-        st.warning("⚠️ Para análisis de URLs necesitas tu API key de Semrush")
-        semrush_key = st.text_input(
-            "Ingresa tu Semrush API Key aquí",
-            type="password",
-            key="semrush_key_urls"
-        )
-    
-    if semrush_key:
-        url_analyzer = URLAnalyzerService(semrush_key)
+    # TAB 5: Análisis de URLs
+    with tab5:
+        st.header("🔗 Análisis de URLs y Directorios")
         
-        # Selector de tipo de análisis
-        analysis_mode = st.radio(
-            "Tipo de análisis",
-            ["URLs Específicas", "Directorios", "Canibalización", "Desde Sitemap"],
-            horizontal=True
-        )
+        st.info("""
+        **Analiza URLs específicas o directorios completos:**
+        - Ver qué keywords rankea cada página
+        - Comparar rendimiento entre directorios
+        - Detectar canibalización de keywords
+        - Auditar contenido de páginas
+        """)
         
-        # ====== MODO 1: URLs ESPECÍFICAS ======
-        if analysis_mode == "URLs Específicas":
-            st.subheader("📝 Analizar URLs Específicas")
+        if not semrush_key:
+            st.warning("⚠️ Para análisis de URLs necesitas tu API key de Semrush")
+            semrush_key_url = st.text_input(
+                "Ingresa tu Semrush API Key",
+                type="password",
+                key="semrush_key_urls"
+            )
+            if semrush_key_url:
+                semrush_key = semrush_key_url
+        
+        if semrush_key:
+            url_analyzer = URLAnalyzerService(semrush_key)
             
-            col1, col2 = st.columns([2, 1])
+            analysis_mode = st.radio(
+                "Tipo de análisis",
+                ["URLs Específicas", "Directorios", "Canibalización"],
+                horizontal=True
+            )
             
-            with col1:
-                urls_input = st.text_area(
-                    "URLs a analizar (una por línea)",
-                    placeholder="https://example.com/blog/article-1\nhttps://example.com/blog/article-2\nhttps://example.com/productos/categoria",
-                    height=150
-                )
+            if analysis_mode == "URLs Específicas":
+                st.subheader("📝 Analizar URLs Específicas")
                 
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    get_keywords = st.checkbox("Obtener keywords (Semrush)", value=True)
-                with col_b:
-                    scrape_content = st.checkbox("Analizar contenido", value=True)
-            
-            with col2:
-                st.markdown("**Métricas obtenidas:**")
-                if get_keywords:
-                    st.markdown("✅ Keywords que rankean")
-                    st.markdown("✅ Volumen de búsqueda")
-                    st.markdown("✅ Tráfico estimado")
-                    st.markdown("✅ Posición promedio")
+                col1, col2 = st.columns([2, 1])
                 
-                if scrape_content:
-                    st.markdown("✅ Title y H1")
-                    st.markdown("✅ Meta description")
-                    st.markdown("✅ Word count")
-            
-            if st.button("🚀 Analizar URLs", type="primary", key="analyze_urls"):
-                if urls_input:
-                    urls = [url.strip() for url in urls_input.split('\n') if url.strip()]
+                with col1:
+                    urls_input = st.text_area(
+                        "URLs a analizar (una por línea)",
+                        placeholder="https://example.com/blog/article-1\nhttps://example.com/productos/categoria",
+                        height=150
+                    )
                     
-                    if urls:
-                        with st.spinner(f"Analizando {len(urls)} URLs..."):
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        get_keywords = st.checkbox("Obtener keywords", value=True)
+                    with col_b:
+                        scrape_content = st.checkbox("Analizar contenido", value=True)
+                
+                with col2:
+                    st.markdown("**Métricas:**")
+                    if get_keywords:
+                        st.markdown("✅ Keywords rankeando")
+                        st.markdown("✅ Volumen de búsqueda")
+                        st.markdown("✅ Tráfico estimado")
+                    if scrape_content:
+                        st.markdown("✅ Title, H1, Meta")
+                        st.markdown("✅ Word count")
+                
+                if st.button("🚀 Analizar URLs", type="primary", key="analyze_urls"):
+                    if urls_input:
+                        urls = [url.strip() for url in urls_input.split('\n') if url.strip()]
+                        
+                        if urls:
+                            with st.spinner(f"Analizando {len(urls)} URLs..."):
+                                try:
+                                    results_df = url_analyzer.analyze_multiple_urls(
+                                        urls,
+                                        use_semrush=get_keywords,
+                                        scrape_content=scrape_content
+                                    )
+                                    
+                                    st.success(f"✅ Análisis completado")
+                                    
+                                    if get_keywords:
+                                        col1, col2, col3, col4 = st.columns(4)
+                                        with col1:
+                                            st.metric("Total Keywords", f"{results_df['total_keywords'].sum():,.0f}")
+                                        with col2:
+                                            st.metric("Volumen Total", f"{results_df['total_volume'].sum():,.0f}")
+                                        with col3:
+                                            st.metric("Tráfico Total", f"{results_df['total_traffic'].sum():,.0f}")
+                                        with col4:
+                                            st.metric("Pos. Promedio", f"{results_df['avg_position'].mean():.1f}")
+                                    
+                                    st.subheader("📊 Resultados")
+                                    st.dataframe(results_df, use_container_width=True, height=400)
+                                    
+                                    csv = results_df.to_csv(index=False)
+                                    st.download_button(
+                                        "💾 Descargar CSV",
+                                        csv,
+                                        f"url_analysis_{datetime.now().strftime('%Y%m%d')}.csv",
+                                        "text/csv"
+                                    )
+                                    
+                                except Exception as e:
+                                    st.error(f"❌ Error: {str(e)}")
+                    else:
+                        st.warning("⚠️ Ingresa al menos una URL")
+            
+            elif analysis_mode == "Directorios":
+                st.subheader("📂 Comparar Directorios")
+                
+                col1, col2 = st.columns([2, 1])
+                
+                with col1:
+                    domain = st.text_input("Dominio base", placeholder="example.com")
+                    
+                    directories_input = st.text_area(
+                        "Directorios (uno por línea)",
+                        placeholder="/blog/\n/productos/\n/guias/",
+                        height=150
+                    )
+                
+                with col2:
+                    st.markdown("**Casos de uso:**")
+                    st.markdown("🎯 Comparar secciones")
+                    st.markdown("🎯 Priorizar optimización")
+                    st.markdown("🎯 Estrategia de contenido")
+                
+                if st.button("🔍 Comparar", type="primary", key="compare_dirs"):
+                    if domain and directories_input:
+                        directories = [d.strip() for d in directories_input.split('\n') if d.strip()]
+                        
+                        with st.spinner("Analizando directorios..."):
                             try:
-                                results_df = url_analyzer.analyze_multiple_urls(
-                                    urls,
-                                    use_semrush=get_keywords,
-                                    scrape_content=scrape_content
-                                )
+                                comparison_df = url_analyzer.compare_directories(domain, directories)
                                 
-                                st.success(f"✅ Análisis completado para {len(urls)} URLs")
-                                
-                                # Mostrar métricas
-                                if get_keywords:
-                                    col1, col2, col3, col4 = st.columns(4)
-                                    with col1:
-                                        st.metric("Total Keywords", f"{results_df['total_keywords'].sum():,.0f}")
-                                    with col2:
-                                        st.metric("Volumen Total", f"{results_df['total_volume'].sum():,.0f}")
-                                    with col3:
-                                        st.metric("Tráfico Total", f"{results_df['total_traffic'].sum():,.0f}")
-                                    with col4:
-                                        st.metric("Pos. Promedio", f"{results_df['avg_position'].mean():.1f}")
-                                
-                                # Tabla de resultados
-                                st.subheader("📊 Resultados Detallados")
-                                st.dataframe(results_df, use_container_width=True, height=400)
-                                
-                                # Exportar
-                                csv = results_df.to_csv(index=False)
-                                st.download_button(
-                                    "💾 Descargar CSV",
-                                    csv,
-                                    f"url_analysis_{datetime.now().strftime('%Y%m%d')}.csv",
-                                    "text/csv"
-                                )
-                                
-                                # Guardar en session state para análisis con IA
-                                st.session_state.url_analysis = results_df
-                                
-                                st.info("💡 **Tip:** Usa estos datos en el tab 'Análisis con IA' para obtener insights estratégicos")
-                                
-                            except Exception as e:
-                                st.error(f"❌ Error en el análisis: {str(e)}")
-                else:
-                    st.warning("⚠️ Ingresa al menos una URL")
-        
-        # ====== MODO 2: DIRECTORIOS ======
-        elif analysis_mode == "Directorios":
-            st.subheader("📂 Comparar Directorios")
-            
-            col1, col2 = st.columns([2, 1])
-            
-            with col1:
-                domain = st.text_input(
-                    "Dominio base",
-                    placeholder="example.com",
-                    help="Sin https://"
-                )
-                
-                directories_input = st.text_area(
-                    "Directorios a comparar (uno por línea)",
-                    placeholder="/blog/\n/productos/\n/guias/\n/recursos/",
-                    height=150
-                )
-            
-            with col2:
-                st.markdown("**Casos de uso:**")
-                st.markdown("🎯 Identificar secciones con mejor rendimiento")
-                st.markdown("🎯 Comparar blog vs productos")
-                st.markdown("🎯 Priorizar optimización por sección")
-                st.markdown("🎯 Estrategia de contenido por área")
-            
-            if st.button("🔍 Comparar Directorios", type="primary", key="compare_dirs"):
-                if domain and directories_input:
-                    directories = [d.strip() for d in directories_input.split('\n') if d.strip()]
-                    
-                    with st.spinner(f"Analizando {len(directories)} directorios..."):
-                        try:
-                            comparison_df = url_analyzer.compare_directories(domain, directories)
-                            
-                            if not comparison_df.empty:
-                                st.success("✅ Comparación completada")
-                                
-                                # Gráfico de comparación
-                                st.subheader("📊 Comparación Visual")
-                                
-                                tab_vol, tab_traf, tab_kw = st.tabs(["Por Volumen", "Por Tráfico", "Por Keywords"])
-                                
-                                with tab_vol:
+                                if not comparison_df.empty:
+                                    st.success("✅ Comparación completada")
+                                    
                                     fig = px.bar(
                                         comparison_df.sort_values('total_volume', ascending=False),
                                         x='directory',
                                         y='total_volume',
-                                        title='Volumen de Búsqueda por Directorio',
+                                        title='Volumen por Directorio',
                                         color='total_volume',
                                         color_continuous_scale=['#C5C0D4', '#51437E', '#170453', '#FF6000']
                                     )
                                     st.plotly_chart(fig, use_container_width=True)
-                                
-                                with tab_traf:
-                                    fig = px.bar(
-                                        comparison_df.sort_values('total_traffic', ascending=False),
-                                        x='directory',
-                                        y='total_traffic',
-                                        title='Tráfico Estimado por Directorio',
-                                        color='total_traffic',
-                                        color_continuous_scale=['#C5C0D4', '#51437E', '#170453', '#FF6000']
+                                    
+                                    st.dataframe(comparison_df, use_container_width=True)
+                                    
+                                    csv = comparison_df.to_csv(index=False)
+                                    st.download_button(
+                                        "💾 Descargar",
+                                        csv,
+                                        f"directory_comparison_{datetime.now().strftime('%Y%m%d')}.csv",
+                                        "text/csv"
                                     )
-                                    st.plotly_chart(fig, use_container_width=True)
-                                
-                                with tab_kw:
-                                    fig = px.bar(
-                                        comparison_df.sort_values('total_keywords', ascending=False),
-                                        x='directory',
-                                        y='total_keywords',
-                                        title='Keywords por Directorio',
-                                        color='total_keywords',
-                                        color_continuous_scale=['#C5C0D4', '#51437E', '#170453', '#FF6000']
-                                    )
-                                    st.plotly_chart(fig, use_container_width=True)
-                                
-                                # Tabla detallada
-                                st.subheader("📋 Datos Detallados")
-                                st.dataframe(comparison_df, use_container_width=True)
-                                
-                                # Exportar
-                                csv = comparison_df.to_csv(index=False)
-                                st.download_button(
-                                    "💾 Descargar Comparación",
-                                    csv,
-                                    f"directory_comparison_{datetime.now().strftime('%Y%m%d')}.csv",
-                                    "text/csv"
+                                else:
+                                    st.warning("No se encontraron datos")
+                                    
+                            except Exception as e:
+                                st.error(f"❌ Error: {str(e)}")
+                    else:
+                        st.warning("⚠️ Completa dominio y directorios")
+            
+            elif analysis_mode == "Canibalización":
+                st.subheader("⚠️ Detectar Canibalización")
+                
+                st.markdown("""
+                **¿Qué es?** Múltiples URLs compiten por las mismas keywords,
+                diluyendo la autoridad.
+                """)
+                
+                col1, col2 = st.columns([2, 1])
+                
+                with col1:
+                    domain = st.text_input("Dominio", placeholder="example.com", key="canib_domain")
+                    
+                    min_keywords = st.slider(
+                        "Mínimo keywords en común",
+                        min_value=3,
+                        max_value=20,
+                        value=5
+                    )
+                
+                with col2:
+                    st.markdown("**Beneficios:**")
+                    st.markdown("✅ Identificar duplicados")
+                    st.markdown("✅ Consolidar páginas")
+                    st.markdown("✅ Mejorar rankings")
+                
+                if st.button("🔍 Detectar", type="primary", key="detect_canib"):
+                    if domain:
+                        with st.spinner("Analizando..."):
+                            try:
+                                canib_df = url_analyzer.detect_cannibalization(
+                                    domain,
+                                    min_common_keywords=min_keywords
                                 )
-                            else:
-                                st.warning("No se encontraron datos para los directorios especificados")
                                 
-                        except Exception as e:
-                            st.error(f"❌ Error: {str(e)}")
-                else:
-                    st.warning("⚠️ Completa dominio y directorios")
-        
-        # ====== MODO 3: CANIBALIZACIÓN ======
-        elif analysis_mode == "Canibalización":
-            st.subheader("⚠️ Detectar Canibalización de Keywords")
-            
-            st.markdown("""
-            **¿Qué es la canibalización?**  
-            Ocurre cuando múltiples URLs de tu sitio compiten por las mismas keywords, 
-            diluyendo la autoridad y confundiendo a los motores de búsqueda.
-            """)
-            
-            col1, col2 = st.columns([2, 1])
-            
-            with col1:
-                domain = st.text_input(
-                    "Dominio a analizar",
-                    placeholder="example.com",
-                    key="canib_domain"
-                )
-                
-                min_keywords = st.slider(
-                    "Mínimo de keywords en común",
-                    min_value=3,
-                    max_value=20,
-                    value=5,
-                    help="Número mínimo de keywords compartidas para considerar canibalización"
-                )
-            
-            with col2:
-                st.markdown("**Beneficios:**")
-                st.markdown("✅ Identificar contenido duplicado")
-                st.markdown("✅ Consolidar páginas similares")
-                st.markdown("✅ Mejorar autoridad de página")
-                st.markdown("✅ Aumentar rankings")
-            
-            if st.button("🔍 Detectar Canibalización", type="primary", key="detect_canib"):
-                if domain:
-                    with st.spinner("Analizando canibalización... (esto puede tardar)"):
-                        try:
-                            canib_df = url_analyzer.detect_cannibalization(
-                                domain,
-                                min_common_keywords=min_keywords
-                            )
-                            
-                            if not canib_df.empty:
-                                st.warning(f"⚠️ Se detectaron {len(canib_df)} casos de posible canibalización")
-                                
-                                # Mostrar casos más graves
-                                st.subheader("🚨 Casos Más Críticos")
-                                
-                                top_cases = canib_df.head(10)
-                                
-                                for idx, row in top_cases.iterrows():
-                                    with st.expander(
-                                        f"🔴 {row['common_keywords_count']} keywords en común",
-                                        expanded=(idx < 3)
-                                    ):
-                                        col_a, col_b = st.columns(2)
-                                        
-                                        with col_a:
-                                            st.markdown("**URL 1:**")
-                                            st.code(row['url_1'], language=None)
-                                        
-                                        with col_b:
-                                            st.markdown("**URL 2:**")
-                                            st.code(row['url_2'], language=None)
-                                        
-                                        st.markdown("**Keywords en común:**")
-                                        st.info(row['common_keywords'])
-                                        
-                                        st.markdown("**💡 Recomendación:**")
-                                        st.markdown(
-                                            "- Revisa si ambas URLs son necesarias\n"
-                                            "- Considera consolidar el contenido en una sola URL\n"
-                                            "- Usa canonical tags si el contenido debe permanecer separado\n"
-                                            "- Diferencia mejor el enfoque de cada página"
-                                        )
-                                
-                                # Tabla completa
-                                st.subheader("📋 Todos los Casos")
-                                st.dataframe(canib_df, use_container_width=True, height=400)
-                                
-                                # Exportar
-                                csv = canib_df.to_csv(index=False)
-                                st.download_button(
-                                    "💾 Descargar Reporte",
-                                    csv,
-                                    f"cannibalization_{datetime.now().strftime('%Y%m%d')}.csv",
-                                    "text/csv"
-                                )
-                            else:
-                                st.success("✅ No se detectó canibalización significativa en tu sitio")
-                                
-                        except Exception as e:
-                            st.error(f"❌ Error: {str(e)}")
-                else:
-                    st.warning("⚠️ Ingresa el dominio")
-        
-        # ====== MODO 4: DESDE SITEMAP ======
-        elif analysis_mode == "Desde Sitemap":
-            st.subheader("🗺️ Analizar URLs desde Sitemap")
-            
-            col1, col2 = st.columns([2, 1])
-            
-            with col1:
-                domain = st.text_input(
-                    "Dominio",
-                    placeholder="example.com",
-                    key="sitemap_domain"
-                )
-                
-                st.markdown("**Filtros opcionales:**")
-                
-                filter_directory = st.text_input(
-                    "Filtrar por directorio (opcional)",
-                    placeholder="/blog/",
-                    help="Solo analizar URLs que empiecen con este path"
-                )
-                
-                max_urls = st.slider(
-                    "Máximo de URLs a analizar",
-                    min_value=10,
-                    max_value=500,
-                    value=100,
-                    step=10
-                )
-            
-            with col2:
-                st.markdown("**Proceso:**")
-                st.markdown("1️⃣ Extrae URLs del sitemap.xml")
-                st.markdown("2️⃣ Filtra por directorio (opcional)")
-                st.markdown("3️⃣ Analiza keywords con Semrush")
-                st.markdown("4️⃣ Extrae contenido de cada página")
-            
-            if st.button("🗺️ Obtener URLs del Sitemap", key="get_sitemap"):
-                if domain:
-                    with st.spinner("Obteniendo URLs del sitemap..."):
-                        try:
-                            urls = url_analyzer.get_sitemap_urls(domain)
-                            
-                            if urls:
-                                st.success(f"✅ Se encontraron {len(urls)} URLs en el sitemap")
-                                
-                                # Filtrar por directorio si se especificó
-                                if filter_directory:
-                                    filtered_urls = url_analyzer.filter_urls_by_directory(
-                                        urls, 
-                                        filter_directory
+                                if not canib_df.empty:
+                                    st.warning(f"⚠️ {len(canib_df)} casos detectados")
+                                    
+                                    st.subheader("🚨 Casos Críticos")
+                                    
+                                    for idx, row in canib_df.head(5).iterrows():
+                                        with st.expander(f"🔴 {row['common_keywords_count']} keywords en común"):
+                                            col_a, col_b = st.columns(2)
+                                            
+                                            with col_a:
+                                                st.markdown("**URL 1:**")
+                                                st.code(row['url_1'], language=None)
+                                            
+                                            with col_b:
+                                                st.markdown("**URL 2:**")
+                                                st.code(row['url_2'], language=None)
+                                            
+                                            st.info(row['common_keywords'])
+                                    
+                                    st.dataframe(canib_df, use_container_width=True, height=400)
+                                    
+                                    csv = canib_df.to_csv(index=False)
+                                    st.download_button(
+                                        "💾 Descargar",
+                                        csv,
+                                        f"cannibalization_{datetime.now().strftime('%Y%m%d')}.csv",
+                                        "text/csv"
                                     )
-                                    st.info(f"📂 {len(filtered_urls)} URLs coinciden con '{filter_directory}'")
-                                    urls = filtered_urls
-                                
-                                # Limitar al máximo
-                                urls = urls[:max_urls]
-                                
-                                # Mostrar preview
-                                with st.expander("👁️ Preview de URLs", expanded=True):
-                                    st.code('\n'.join(urls[:20]), language=None)
-                                    if len(urls) > 20:
-                                        st.caption(f"... y {len(urls) - 20} URLs más")
-                                
-                                # Analizar
-                                if st.button("🚀 Analizar estas URLs", type="primary", key="analyze_sitemap_urls"):
-                                    with st.spinner(f"Analizando {len(urls)} URLs..."):
-                                        results_df = url_analyzer.analyze_multiple_urls(
-                                            urls,
-                                            use_semrush=True,
-                                            scrape_content=True
-                                        )
-                                        
-                                        st.success("✅ Análisis completado")
-                                        
-                                        # Métricas
-                                        col1, col2, col3, col4 = st.columns(4)
-                                        with col1:
-                                            st.metric("URLs Analizadas", len(results_df))
-                                        with col2:
-                                            st.metric("Total Keywords", f"{results_df['total_keywords'].sum():,.0f}")
-                                        with col3:
-                                            st.metric("Volumen Total", f"{results_df['total_volume'].sum():,.0f}")
-                                        with col4:
-                                            st.metric("Tráfico Total", f"{results_df['total_traffic'].sum():,.0f}")
-                                        
-                                        # Resultados
-                                        st.dataframe(results_df, use_container_width=True, height=400)
-                                        
-                                        # Exportar
-                                        csv = results_df.to_csv(index=False)
-                                        st.download_button(
-                                            "💾 Descargar Resultados",
-                                            csv,
-                                            f"sitemap_analysis_{datetime.now().strftime('%Y%m%d')}.csv",
-                                            "text/csv"
-                                        )
-                            else:
-                                st.warning("No se pudo encontrar el sitemap o está vacío")
-                                
-                        except Exception as e:
-                            st.error(f"❌ Error: {str(e)}")
-                else:
-                    st.warning("⚠️ Ingresa el dominio")
-    else:
-        st.info("👆 Configura tu API key de Semrush en la barra lateral para usar esta funcionalidad")
+                                else:
+                                    st.success("✅ No se detectó canibalización")
+                                    
+                            except Exception as e:
+                                st.error(f"❌ Error: {str(e)}")
+                    else:
+                        st.warning("⚠️ Ingresa el dominio")
+        else:
+            st.info("👆 Configura tu API key de Semrush")
 
 if __name__ == "__main__":
     main()
