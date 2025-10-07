@@ -32,26 +32,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.info(f"Inicializando Keyword Universe Analyzer v{__version__}")
 
-# Importar componentes principales (lazy loading para evitar errores circulares)
-try:
-    from app.services.anthropic_service import AnthropicService
-    from app.services.semrush_service import SemrushService
-    from app.components.data_processor import DataProcessor
-    from app.components.visualizer import KeywordVisualizer
-    
-    __all__ = [
-        'AnthropicService',
-        'SemrushService',
-        'DataProcessor',
-        'KeywordVisualizer',
-        '__version__',
-    ]
-    
-    logger.info("Componentes principales cargados correctamente")
-    
-except ImportError as e:
-    logger.warning(f"Algunos componentes no pudieron ser importados: {e}")
-    __all__ = ['__version__']
+# ARREGLO: No importar componentes automáticamente para evitar importaciones circulares
+# Los imports se harán directamente en los módulos que los necesiten
+__all__ = ['__version__']
 
 # Metadata del paquete
 PACKAGE_INFO = {
@@ -72,3 +55,42 @@ def get_version() -> str:
 def get_package_info() -> dict:
     """Retorna información del paquete."""
     return PACKAGE_INFO.copy()
+
+# Lazy imports opcionales para evitar errores circulares
+def get_anthropic_service():
+    """Lazy import de AnthropicService"""
+    try:
+        from app.services.anthropic_service import AnthropicService
+        return AnthropicService
+    except ImportError as e:
+        logger.warning(f"No se pudo importar AnthropicService: {e}")
+        return None
+
+def get_semrush_service():
+    """Lazy import de SemrushService"""
+    try:
+        from app.services.semrush_service import SemrushService
+        return SemrushService
+    except ImportError as e:
+        logger.warning(f"No se pudo importar SemrushService: {e}")
+        return None
+
+def get_data_processor():
+    """Lazy import de DataProcessor"""
+    try:
+        from app.components.data_processor import DataProcessor
+        return DataProcessor
+    except ImportError as e:
+        logger.warning(f"No se pudo importar DataProcessor: {e}")
+        return None
+
+def get_visualizer():
+    """Lazy import de KeywordVisualizer"""
+    try:
+        from app.components.visualizer import KeywordVisualizer
+        return KeywordVisualizer
+    except ImportError as e:
+        logger.warning(f"No se pudo importar KeywordVisualizer: {e}")
+        return None
+
+logger.info("Paquete inicializado correctamente")
