@@ -15,7 +15,8 @@ from app.services.semrush_service import SemrushService
 from app.components.data_processor import DataProcessor
 from app.components.visualizer import KeywordVisualizer
 from app.utils.helpers import export_to_excel, calculate_metrics
-from app.utils.cache import AnalysisCache  # ← NUEVO: Sistema de caché
+from app.utils.cache import AnalysisCache
+from app.utils.pdf_generator import generate_comprehensive_pdf
 
 # Importar configuración del logo
 try:
@@ -32,7 +33,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS personalizado con branding PC Componentes - OPTIMIZADO PARA USABILIDAD
+# CSS personalizado COMPLETO con branding PC Componentes
 st.markdown("""
 <style>
     /* Colores corporativos PC Componentes */
@@ -68,16 +69,26 @@ st.markdown("""
         opacity: 0.9;
     }
     
-    /* Logo container */
-    .logo-container {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-        padding: 1rem;
-        background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
-        border-radius: 12px;
-        border-left: 4px solid #FF6000;
+    /* NUEVO: Badges de estado de análisis */
+    .analysis-badge {
+        display: inline-block;
+        padding: 0.4rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin: 0.2rem;
+    }
+    
+    .badge-completed {
+        background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+        color: white;
+        box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+    }
+    
+    .badge-pending {
+        background: linear-gradient(135deg, #CCCCCC 0%, #999999 100%);
+        color: white;
+        box-shadow: 0 2px 4px rgba(153, 153, 153, 0.2);
     }
     
     /* Botones primarios */
@@ -115,7 +126,7 @@ st.markdown("""
     }
     
     /* ============================================
-       SIDEBAR - CONFIGURACIÓN EQUILIBRADA
+       SIDEBAR - CONFIGURACIÓN COMPLETA
        ============================================ */
     
     /* Sidebar principal */
@@ -286,6 +297,25 @@ st.markdown("""
         font-weight: 600 !important;
     }
     
+    /* ========== RADIO BUTTONS ========== */
+    [data-testid="stSidebar"] .stRadio > div {
+        background-color: transparent !important;
+    }
+    
+    [data-testid="stSidebar"] input[type="radio"]:checked + div {
+        background-color: #FF6000 !important;
+        border-color: #FF6000 !important;
+    }
+    
+    /* ========== SLIDERS ========== */
+    [data-testid="stSidebar"] .stSlider {
+        padding: 1rem 0 !important;
+    }
+    
+    [data-testid="stSidebar"] .stSlider [role="slider"] {
+        background-color: #FF6000 !important;
+    }
+    
     /* ========== NUMBER INPUT ========== */
     [data-testid="stSidebar"] .stNumberInput input {
         background-color: #1F0A5C !important;
@@ -294,16 +324,73 @@ st.markdown("""
         border-radius: 6px !important;
     }
     
+    [data-testid="stSidebar"] .stNumberInput input:hover {
+        border-color: rgba(255, 134, 64, 0.5) !important;
+    }
+    
+    [data-testid="stSidebar"] .stNumberInput input:focus {
+        border-color: #FF8640 !important;
+        box-shadow: 0 0 0 2px rgba(255, 134, 64, 0.2) !important;
+    }
+    
     [data-testid="stSidebar"] .stNumberInput button {
         background-color: rgba(255, 96, 0, 0.2) !important;
         color: #FFB380 !important;
         border: none !important;
+        border-radius: 0 !important;
     }
     
     [data-testid="stSidebar"] .stNumberInput button:hover {
         background-color: rgba(255, 96, 0, 0.35) !important;
         color: #FFFFFF !important;
     }
+    
+    /* ========== TEXT AREAS ========== */
+    [data-testid="stSidebar"] .stTextArea textarea {
+        background-color: #1F0A5C !important;
+        border: 1px solid rgba(255, 134, 64, 0.3) !important;
+        color: #FFFFFF !important;
+        border-radius: 6px !important;
+    }
+    
+    [data-testid="stSidebar"] .stTextArea textarea:hover {
+        border-color: rgba(255, 134, 64, 0.5) !important;
+    }
+    
+    [data-testid="stSidebar"] .stTextArea textarea:focus {
+        border-color: #FF8640 !important;
+        box-shadow: 0 0 0 2px rgba(255, 134, 64, 0.2) !important;
+    }
+    
+    /* ========== INFO BOXES ========== */
+    [data-testid="stSidebar"] .stAlert {
+        background-color: rgba(255, 96, 0, 0.15) !important;
+        border-left: 3px solid #FF8640 !important;
+        color: #F5F5F5 !important;
+        border-radius: 6px !important;
+    }
+    
+    [data-testid="stSidebar"] .stAlert * {
+        color: #F5F5F5 !important;
+    }
+    
+    /* ========== DIVIDERS ========== */
+    [data-testid="stSidebar"] hr {
+        border-color: rgba(255, 134, 64, 0.3) !important;
+        margin: 1.5rem 0 !important;
+    }
+    
+    /* ========== HEADERS ========== */
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3 {
+        color: #FFFFFF !important;
+        font-weight: 700 !important;
+    }
+    
+    /* ============================================
+       FIN SIDEBAR - ÁREA PRINCIPAL
+       ============================================ */
     
     /* Tabs */
     .stTabs [data-baseweb="tab-list"] {
@@ -334,6 +421,84 @@ st.markdown("""
         border-color: #FF6000;
     }
     
+    /* Info boxes */
+    .stAlert {
+        border-radius: 10px;
+        border-left-width: 4px;
+    }
+    
+    /* Success */
+    [data-baseweb="notification"][kind="success"] {
+        background-color: #E8F5E9;
+        border-left-color: #4CAF50;
+    }
+    
+    /* Info */
+    [data-baseweb="notification"][kind="info"] {
+        background-color: #FFD7BF;
+        border-left-color: #FF6000;
+    }
+    
+    /* Warning */
+    [data-baseweb="notification"][kind="warning"] {
+        background-color: #FFF3E0;
+        border-left-color: #FF6000;
+    }
+    
+    /* Dataframes */
+    .stDataFrame {
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Headers de secciones */
+    h1, h2, h3 {
+        color: #090029;
+        font-weight: 700;
+    }
+    
+    h2 {
+        border-bottom: 3px solid #FF6000;
+        padding-bottom: 0.5rem;
+        margin-top: 2rem;
+    }
+    
+    /* Dividers */
+    hr {
+        border-color: #FF8640;
+        margin: 2rem 0;
+    }
+    
+    /* Select boxes y inputs del área principal */
+    .stSelectbox > div > div {
+        border-color: #CCCCCC;
+        border-radius: 8px;
+    }
+    
+    .stSelectbox > div > div:focus-within {
+        border-color: #FF6000;
+        box-shadow: 0 0 0 2px rgba(255, 96, 0, 0.1);
+    }
+    
+    /* File uploader */
+    [data-testid="stFileUploader"] {
+        border: 2px dashed #FF8640;
+        border-radius: 10px;
+        padding: 2rem;
+        background: linear-gradient(135deg, #FFFFFF 0%, #FFF9F5 100%);
+    }
+    
+    [data-testid="stFileUploader"]:hover {
+        border-color: #FF6000;
+        background: #FFF9F5;
+    }
+    
+    /* Spinner personalizado */
+    .stSpinner > div {
+        border-top-color: #FF6000 !important;
+    }
+    
     /* Animaciones */
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(10px); }
@@ -354,29 +519,30 @@ if 'uploaded_files' not in st.session_state:
 if 'processed_data' not in st.session_state:
     st.session_state.processed_data = None
 
-# ============================================
-# NUEVO: Inicializar sistema de caché
-# ============================================
+# NUEVO: Tracking de análisis completados
+if 'completed_analyses' not in st.session_state:
+    st.session_state.completed_analyses = {
+        'thematic': None,
+        'intent': None,
+        'funnel': None
+    }
+
+# Sistema de caché
 if 'cache' not in st.session_state:
     st.session_state.cache = AnalysisCache(
         cache_dir="cache",
-        ttl_hours=24  # Caché válido por 24 horas
+        ttl_hours=24
     )
 
 def display_logo():
-    """
-    Muestra el logo con sistema de fallback en cascada
-    Prioridad: URL > Base64 > Archivo local > Placeholder
-    """
-    # Prioridad 1: Logo desde URL externa
+    """Muestra el logo con sistema de fallback"""
     if LOGO_URL:
         try:
             st.image(LOGO_URL, width=120)
             return True
-        except Exception as e:
+        except:
             pass
     
-    # Prioridad 2: Logo en Base64 embebido
     if LOGO_BASE64:
         try:
             st.markdown(
@@ -384,18 +550,16 @@ def display_logo():
                 unsafe_allow_html=True
             )
             return True
-        except Exception as e:
+        except:
             pass
     
-    # Prioridad 3: Logo local en assets/
     if os.path.exists("assets/pc_logo.png"):
         try:
             st.image("assets/pc_logo.png", width=120)
             return True
-        except Exception as e:
+        except:
             pass
     
-    # Prioridad 4: Fallback - Placeholder con iniciales PC
     st.markdown("""
     <div style="background: linear-gradient(135deg, #FF6000 0%, #FF8640 100%); 
                 padding: 1rem; border-radius: 10px; text-align: center;
@@ -405,6 +569,52 @@ def display_logo():
     </div>
     """, unsafe_allow_html=True)
     return False
+
+
+def display_analysis_indicators():
+    """Muestra indicadores visuales de análisis completados"""
+    st.markdown("### 📊 Estado de Análisis")
+    
+    analysis_types = {
+        'thematic': '🎯 Análisis Temático',
+        'intent': '🔍 Análisis de Intención',
+        'funnel': '📊 Análisis de Funnel'
+    }
+    
+    badges_html = ""
+    completed_count = 0
+    
+    for key, name in analysis_types.items():
+        if st.session_state.completed_analyses[key] is not None:
+            badge_class = "badge-completed"
+            icon = "✓"
+            completed_count += 1
+        else:
+            badge_class = "badge-pending"
+            icon = "○"
+        
+        badges_html += f'<span class="analysis-badge {badge_class}">{icon} {name}</span>'
+    
+    st.markdown(badges_html, unsafe_allow_html=True)
+    
+    if completed_count == 0:
+        st.info("💡 No hay análisis completados. Comienza en la pestaña 'Análisis con IA'")
+    elif completed_count < 3:
+        st.warning(f"⚠️ {completed_count}/3 análisis completados. Completa los 3 tipos para un informe PDF completo.")
+    else:
+        st.success("✅ ¡Todos los análisis completados! Puedes generar el informe PDF completo.")
+    
+    return completed_count
+
+
+def map_analysis_type_to_key(analysis_type: str) -> str:
+    """Mapea el tipo de análisis a la clave del diccionario"""
+    mapping = {
+        "Temática (Topics)": "thematic",
+        "Intención de búsqueda": "intent",
+        "Funnel de conversión": "funnel"
+    }
+    return mapping.get(analysis_type, "thematic")
 
 
 def main():
@@ -422,15 +632,13 @@ def main():
     with st.sidebar:
         st.header("⚙️ Configuración")
         
-        # Selección de proveedor de IA
         with st.expander("🤖 Proveedor de IA", expanded=True):
             ai_provider = st.selectbox(
                 "Selecciona el proveedor de IA",
                 ["Claude (Anthropic)", "OpenAI", "Ambos (Validación Cruzada)"],
-                help="Claude Sonnet 4.5 es más analítico. GPT-4 es más rápido."
+                help="Claude Sonnet 4.5 es más analítico. GPT-4o es más rápido."
             )
         
-        # API Keys
         with st.expander("🔑 API Keys", expanded=True):
             anthropic_key = None
             openai_key = None
@@ -446,14 +654,12 @@ def main():
             semrush_key = st.text_input("Semrush API Key", type="password",
                                        help="Tu API key de Semrush (opcional)")
         
-        # Configuración del análisis
         with st.expander("🎯 Parámetros de Análisis"):
             max_keywords = st.slider("Máximo de keywords por competidor", 
                                     100, 5000, 1000, 100)
             min_volume = st.number_input("Volumen mínimo de búsqueda", 
                                         min_value=0, value=10)
             
-            # Selección de modelo según proveedor
             if ai_provider == "Claude (Anthropic)":
                 model_choice = st.selectbox("Modelo Claude", 
                                            ["claude-sonnet-4-5-20250929", 
@@ -464,7 +670,7 @@ def main():
                                             "gpt-4-turbo",
                                             "gpt-4",
                                             "gpt-3.5-turbo"])
-            else:  # Ambos
+            else:
                 col1, col2 = st.columns(2)
                 with col1:
                     claude_model = st.selectbox("Modelo Claude", 
@@ -475,9 +681,6 @@ def main():
                                                ["gpt-4o",
                                                 "gpt-4-turbo"])
         
-        # ============================================
-        # NUEVO: Stats de caché
-        # ============================================
         with st.expander("💾 Estado del Caché"):
             stats = st.session_state.cache.get_stats()
             
@@ -511,8 +714,6 @@ def main():
                         st.info("Caché vacío")
         
         st.divider()
-        
-        # Info
         st.info("💡 **Tip:** Sube archivos CSV o Excel de Ahrefs, Semrush o similar con columnas: keyword, volume, traffic")
     
     # Tabs principales
@@ -530,7 +731,6 @@ def main():
         col1, col2 = st.columns([2, 1])
         
         with col1:
-            # Opción 1: Cargar archivos
             st.subheader("Opción 1: Cargar archivos exportados")
             uploaded_files = st.file_uploader(
                 "Sube archivos CSV o Excel de tus competidores",
@@ -543,7 +743,6 @@ def main():
                 st.session_state.uploaded_files = uploaded_files
                 st.success(f"✅ {len(uploaded_files)} archivo(s) cargado(s)")
                 
-                # Preview de los datos
                 for file in uploaded_files:
                     with st.expander(f"👁️ Preview: {file.name}"):
                         try:
@@ -558,7 +757,6 @@ def main():
                             st.error(f"Error al leer el archivo: {str(e)}")
         
         with col2:
-            # Opción 2: Integración directa con Semrush
             st.subheader("Opción 2: Semrush API")
             
             if semrush_key:
@@ -597,7 +795,6 @@ def main():
     with tab2:
         st.header("Análisis con IA")
         
-        # Validar API keys según proveedor
         if ai_provider == "Claude (Anthropic)" and not anthropic_key:
             st.warning("⚠️ Por favor ingresa tu API key de Anthropic en la barra lateral")
             return
@@ -612,7 +809,6 @@ def main():
             st.info("📁 Primero carga datos en la pestaña 'Carga de Datos'")
             return
         
-        # Preparar datos
         if st.session_state.processed_data is None and st.session_state.uploaded_files:
             processor = DataProcessor()
             st.session_state.processed_data = processor.process_files(
@@ -623,7 +819,10 @@ def main():
         if st.session_state.processed_data is not None:
             df = st.session_state.processed_data
             
-            # Métricas rápidas
+            # Mostrar indicadores de análisis
+            display_analysis_indicators()
+            st.divider()
+            
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.metric("Total Keywords", f"{len(df):,}")
@@ -636,7 +835,6 @@ def main():
             
             st.divider()
             
-            # Configuración del prompt
             col1, col2 = st.columns([2, 1])
             
             with col1:
@@ -662,12 +860,8 @@ def main():
                 include_trends = st.checkbox("Identificar tendencias emergentes", value=True)
                 include_gaps = st.checkbox("Detectar gaps de contenido", value=True)
             
-            # ============================================
-            # MODIFICADO: Botón de análisis con caché
-            # ============================================
             if st.button("🚀 Analizar con IA", type="primary", use_container_width=True):
                 
-                # PRIMERO: Intentar recuperar del caché
                 with st.spinner("🔍 Buscando en caché..."):
                     cached_result = st.session_state.cache.get(
                         df=df,
@@ -677,13 +871,11 @@ def main():
                     )
                 
                 if cached_result:
-                    # ✅ ENCONTRADO EN CACHÉ - NO GASTAR CRÉDITOS
                     st.success("💾 ¡Resultado recuperado del caché! **No se gastaron créditos de API.**")
                     st.balloons()
                     
                     result = cached_result['result']
                     
-                    # Mostrar info del caché
                     cache_age = datetime.now() - datetime.fromisoformat(cached_result['cached_at'])
                     hours = int(cache_age.total_seconds() / 3600)
                     minutes = int((cache_age.total_seconds() % 3600) / 60)
@@ -691,13 +883,11 @@ def main():
                     st.info(f"📅 Análisis guardado hace {hours}h {minutes}m")
                     
                 else:
-                    # ❌ NO EN CACHÉ - HACER ANÁLISIS NUEVO
                     st.info("💡 Análisis no encontrado en caché. Se realizará un nuevo análisis (esto consumirá créditos de API).")
                     
                     with st.spinner(f"🧠 {ai_provider.split('(')[0].strip()} está analizando tu universo de keywords..."):
                         try:
                             if ai_provider == "Claude (Anthropic)":
-                                # Análisis con Claude
                                 anthropic_service = AnthropicService(anthropic_key, model_choice)
                                 
                                 prompt = anthropic_service.create_universe_prompt(
@@ -715,7 +905,6 @@ def main():
                                 result['model'] = model_choice
                                 
                             elif ai_provider == "OpenAI":
-                                # Análisis con OpenAI
                                 from app.services.openai_service import OpenAIService
                                 
                                 openai_service = OpenAIService(openai_key, model_choice)
@@ -734,10 +923,9 @@ def main():
                                 result['provider'] = 'OpenAI'
                                 result['model'] = model_choice
                                 
-                            else:  # Ambos (Validación Cruzada)
+                            else:
                                 from app.services.openai_service import OpenAIService
                                 
-                                # Análisis con Claude
                                 st.info("1️⃣ Analizando con Claude...")
                                 anthropic_service = AnthropicService(anthropic_key, claude_model)
                                 
@@ -753,7 +941,6 @@ def main():
                                 
                                 result_claude = anthropic_service.analyze_keywords(prompt_claude, df)
                                 
-                                # Análisis con OpenAI
                                 st.info("2️⃣ Analizando con OpenAI...")
                                 openai_service = OpenAIService(openai_key, openai_model)
                                 
@@ -769,11 +956,9 @@ def main():
                                 
                                 result_openai = openai_service.analyze_keywords(messages_openai, df)
                                 
-                                # Validación cruzada
                                 st.info("3️⃣ Comparando resultados...")
                                 comparison = openai_service.compare_with_claude(result_claude, df)
                                 
-                                # Combinar resultados
                                 result = {
                                     'summary': f"**Análisis de Claude:**\n{result_claude.get('summary', '')}\n\n**Análisis de OpenAI:**\n{result_openai.get('summary', '')}",
                                     'topics': result_claude.get('topics', []),
@@ -788,9 +973,6 @@ def main():
                                 if 'trends' in result_claude:
                                     result['trends'] = result_claude['trends']
                             
-                            # ============================================
-                            # NUEVO: Guardar resultado en caché
-                            # ============================================
                             st.session_state.cache.set(
                                 df=df,
                                 analysis_type=analysis_type,
@@ -810,17 +992,20 @@ def main():
                                 st.code(traceback.format_exc())
                             return
                 
-                # Guardar resultado en session state
+                # Guardar por tipo
+                analysis_key = map_analysis_type_to_key(analysis_type)
+                st.session_state.completed_analyses[analysis_key] = result
                 st.session_state.keyword_universe = result
+                
+                st.success(f"✅ Análisis '{analysis_type}' guardado correctamente")
+                st.rerun()
             
-            # Mostrar resultados si existen
             if st.session_state.keyword_universe:
                 st.divider()
                 st.subheader("📋 Resultados del Análisis")
                 
                 result = st.session_state.keyword_universe
                 
-                # Mostrar info del proveedor
                 provider_col1, provider_col2 = st.columns(2)
                 with provider_col1:
                     st.metric("Proveedor de IA", result.get('provider', 'N/A'))
@@ -830,11 +1015,9 @@ def main():
                     else:
                         st.metric("Modelo", result.get('model', 'N/A'))
                 
-                # Resumen ejecutivo
                 with st.expander("📊 Resumen Ejecutivo", expanded=True):
                     st.markdown(result.get('summary', 'No disponible'))
                 
-                # Si es validación cruzada, mostrar comparación
                 if result.get('provider') == 'Ambos' and 'comparison' in result:
                     with st.expander("🔄 Validación Cruzada", expanded=True):
                         comp = result['comparison']
@@ -851,13 +1034,11 @@ def main():
                             for improvement in comp['improvements']:
                                 st.markdown(f"- {improvement}")
                 
-                # Topics por tier
                 if 'topics' in result:
                     st.subheader("🎯 Topics Identificados (Claude)" if result.get('provider') == 'Ambos' else "🎯 Topics Identificados")
                     
                     topics_df = pd.DataFrame(result['topics'])
                     
-                    # Filtros
                     col1, col2 = st.columns(2)
                     with col1:
                         tier_filter = st.multiselect(
@@ -875,7 +1056,6 @@ def main():
                     
                     st.dataframe(filtered_topics, use_container_width=True, height=400)
                 
-                # Si hay análisis de OpenAI también, mostrarlo
                 if result.get('provider') == 'Ambos' and 'topics_openai' in result:
                     st.subheader("🎯 Topics Identificados (OpenAI)")
                     topics_openai_df = pd.DataFrame(result['topics_openai'])
@@ -895,7 +1075,6 @@ def main():
             visualizer = KeywordVisualizer()
             topics_df = pd.DataFrame(result['topics'])
             
-            # Gráfico de burbujas
             st.subheader("🫧 Mapa de Topics (Bubble Chart)")
             
             fig_bubble = visualizer.create_bubble_chart(topics_df)
@@ -904,18 +1083,15 @@ def main():
             col1, col2 = st.columns(2)
             
             with col1:
-                # Treemap
                 st.subheader("🗺️ Treemap por Volumen")
                 fig_treemap = visualizer.create_treemap(topics_df)
                 st.plotly_chart(fig_treemap, use_container_width=True)
             
             with col2:
-                # Sunburst
                 st.subheader("☀️ Distribución por Tier")
                 fig_sunburst = visualizer.create_sunburst(topics_df)
                 st.plotly_chart(fig_sunburst, use_container_width=True)
             
-            # Análisis de gaps
             if 'gaps' in result:
                 st.divider()
                 st.subheader("🎯 Oportunidades de Contenido")
@@ -929,67 +1105,159 @@ def main():
     with tab4:
         st.header("Exportar Resultados")
         
-        if st.session_state.keyword_universe is None:
-            st.info("🧠 Primero realiza el análisis con Claude")
+        completed_count = sum(1 for v in st.session_state.completed_analyses.values() if v is not None)
+        
+        if completed_count == 0:
+            st.info("🧠 Primero realiza al menos un análisis")
             return
         
-        col1, col2 = st.columns(2)
+        display_analysis_indicators()
+        st.divider()
+        
+        col1, col2 = st.columns([3, 2])
         
         with col1:
             st.subheader("📄 Formato de exportación")
             
             export_format = st.radio(
                 "Selecciona el formato",
-                ["Excel (.xlsx)", "CSV", "JSON"],
-                horizontal=True
+                ["PDF Completo (Recomendado)", "Excel (.xlsx)", "CSV", "JSON"],
+                horizontal=False
             )
             
-            include_visuals = st.checkbox("Incluir gráficos (solo Excel)", value=True)
-            
-            if st.button("💾 Generar archivo", type="primary"):
-                with st.spinner("Generando archivo..."):
-                    try:
-                        if export_format == "Excel (.xlsx)":
-                            file_data = export_to_excel(
-                                st.session_state.keyword_universe,
-                                include_visuals
+            if export_format == "PDF Completo (Recomendado)":
+                st.info("💡 El PDF incluirá todos los análisis completados con formato profesional")
+                
+                st.markdown("**Contenido del informe:**")
+                
+                for key, value in st.session_state.completed_analyses.items():
+                    if value is not None:
+                        analysis_names = {
+                            'thematic': '✓ Análisis Temático (Topics)',
+                            'intent': '✓ Análisis de Intención de Búsqueda',
+                            'funnel': '✓ Análisis de Funnel de Conversión'
+                        }
+                        st.markdown(f"- {analysis_names[key]}")
+                
+                if completed_count < 3:
+                    st.warning(f"⚠️ Solo {completed_count}/3 análisis completados. Para un informe completo, ejecuta los 3 tipos.")
+                
+                st.divider()
+                
+                if st.button("📄 Generar Informe PDF", type="primary", use_container_width=True):
+                    with st.spinner("📝 Generando informe PDF profesional..."):
+                        try:
+                            analyses_for_pdf = {
+                                key: value 
+                                for key, value in st.session_state.completed_analyses.items() 
+                                if value is not None
+                            }
+                            
+                            df = st.session_state.processed_data
+                            total_keywords = len(df)
+                            total_volume = int(df['volume'].sum())
+                            
+                            pdf_bytes = generate_comprehensive_pdf(
+                                analyses_for_pdf,
+                                total_keywords,
+                                total_volume
                             )
+                            
                             st.download_button(
-                                "⬇️ Descargar Excel",
-                                data=file_data,
-                                file_name=f"keyword_universe_{datetime.now().strftime('%Y%m%d')}.xlsx",
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                label="⬇️ Descargar Informe PDF",
+                                data=pdf_bytes,
+                                file_name=f"keyword_universe_report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                                mime="application/pdf"
                             )
-                        elif export_format == "CSV":
-                            topics_df = pd.DataFrame(st.session_state.keyword_universe['topics'])
+                            
+                            st.success("✅ Informe PDF generado correctamente")
+                            st.balloons()
+                            
+                        except Exception as e:
+                            st.error(f"❌ Error al generar PDF: {str(e)}")
+                            import traceback
+                            with st.expander("Ver detalles del error"):
+                                st.code(traceback.format_exc())
+            
+            elif export_format == "Excel (.xlsx)":
+                include_visuals = st.checkbox("Incluir gráficos", value=True)
+                
+                if st.button("💾 Generar Excel", type="primary"):
+                    with st.spinner("Generando Excel..."):
+                        try:
+                            last_analysis = next(
+                                (v for v in st.session_state.completed_analyses.values() if v is not None),
+                                None
+                            )
+                            
+                            if last_analysis:
+                                file_data = export_to_excel(last_analysis, include_visuals)
+                                st.download_button(
+                                    "⬇️ Descargar Excel",
+                                    data=file_data,
+                                    file_name=f"keyword_universe_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                )
+                                st.success("✅ Excel generado")
+                            else:
+                                st.error("No hay análisis disponibles")
+                                
+                        except Exception as e:
+                            st.error(f"Error: {str(e)}")
+            
+            elif export_format == "CSV":
+                if st.button("💾 Generar CSV", type="primary"):
+                    try:
+                        last_analysis = next(
+                            (v for v in st.session_state.completed_analyses.values() if v is not None),
+                            None
+                        )
+                        
+                        if last_analysis and 'topics' in last_analysis:
+                            topics_df = pd.DataFrame(last_analysis['topics'])
                             csv_data = topics_df.to_csv(index=False)
                             st.download_button(
                                 "⬇️ Descargar CSV",
                                 data=csv_data,
-                                file_name=f"keyword_universe_{datetime.now().strftime('%Y%m%d')}.csv",
+                                file_name=f"topics_{datetime.now().strftime('%Y%m%d')}.csv",
                                 mime="text/csv"
                             )
-                        else:  # JSON
-                            import json
-                            json_data = json.dumps(st.session_state.keyword_universe, indent=2)
-                            st.download_button(
-                                "⬇️ Descargar JSON",
-                                data=json_data,
-                                file_name=f"keyword_universe_{datetime.now().strftime('%Y%m%d')}.json",
-                                mime="application/json"
-                            )
-                        
-                        st.success("✅ Archivo generado correctamente")
+                            st.success("✅ CSV generado")
                     except Exception as e:
-                        st.error(f"❌ Error al generar archivo: {str(e)}")
+                        st.error(f"Error: {str(e)}")
+            
+            else:  # JSON
+                if st.button("💾 Generar JSON", type="primary"):
+                    try:
+                        import json
+                        
+                        export_data = {
+                            key: value 
+                            for key, value in st.session_state.completed_analyses.items() 
+                            if value is not None
+                        }
+                        
+                        json_data = json.dumps(export_data, indent=2)
+                        st.download_button(
+                            "⬇️ Descargar JSON",
+                            data=json_data,
+                            file_name=f"analyses_{datetime.now().strftime('%Y%m%d')}.json",
+                            mime="application/json"
+                        )
+                        st.success("✅ JSON generado")
+                    except Exception as e:
+                        st.error(f"Error: {str(e)}")
         
         with col2:
             st.subheader("📊 Resumen de datos")
             
-            result = st.session_state.keyword_universe
+            last_analysis = next(
+                (v for v in st.session_state.completed_analyses.values() if v is not None),
+                None
+            )
             
-            if 'topics' in result:
-                topics_df = pd.DataFrame(result['topics'])
+            if last_analysis and 'topics' in last_analysis:
+                topics_df = pd.DataFrame(last_analysis['topics'])
                 
                 st.metric("Total Topics", len(topics_df))
                 st.metric("Keywords Analizadas", topics_df['keyword_count'].sum())
