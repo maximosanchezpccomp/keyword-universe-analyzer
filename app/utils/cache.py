@@ -1,7 +1,8 @@
 """
 Sistema de caché persistente para evitar llamadas duplicadas a la API
 
-Añade este archivo como: app/utils/cache.py
+Este módulo permite guardar resultados de análisis en disco para reutilizarlos
+sin gastar créditos de API cuando se realizan análisis idénticos.
 """
 
 import json
@@ -12,10 +13,18 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 import pandas as pd
 
+
 class AnalysisCache:
-    """Gestiona caché de análisis para evitar gastos innecesarios"""
+    """Gestiona caché de análisis para evitar gastos innecesarios de API"""
     
     def __init__(self, cache_dir: str = "cache", ttl_hours: int = 24):
+        """
+        Inicializa el sistema de caché
+        
+        Args:
+            cache_dir: Directorio donde guardar el caché
+            ttl_hours: Tiempo de vida del caché en horas (por defecto 24h)
+        """
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(exist_ok=True)
         self.ttl_hours = ttl_hours
@@ -27,9 +36,20 @@ class AnalysisCache:
         num_tiers: int,
         custom_instructions: str
     ) -> str:
-        """Genera un hash único para esta consulta"""
+        """
+        Genera un hash único para esta consulta específica
         
-        # Crear string representativo
+        Args:
+            df: DataFrame con las keywords
+            analysis_type: Tipo de análisis (Temática, Intención, Funnel)
+            num_tiers: Número de tiers solicitados
+            custom_instructions: Instrucciones personalizadas del usuario
+        
+        Returns:
+            Hash MD5 único que identifica esta consulta
+        """
+        
+        # Crear string representativo de la consulta
         cache_data = {
             'keywords_hash': hashlib.md5(
                 ''.join(sorted(df['keyword'].head(100))).encode()
@@ -41,7 +61,7 @@ class AnalysisCache:
             'custom_instructions': custom_instructions
         }
         
-        # Generar hash
+        # Generar hash único
         cache_string = json.dumps(cache_data, sort_keys=True)
         return hashlib.md5(cache_string.encode()).hexdigest()
     
@@ -52,7 +72,18 @@ class AnalysisCache:
         num_tiers: int,
         custom_instructions: str = ""
     ) -> Optional[Dict[str, Any]]:
-        """Intenta recuperar resultado del caché"""
+        """
+        Intenta recuperar resultado del caché
+        
+        Args:
+            df: DataFrame con las keywords
+            analysis_type: Tipo de análisis
+            num_tiers: Número de tiers
+            custom_instructions: Instrucciones personalizadas
+        
+        Returns:
+            Diccionario con el resultado si existe, None si no está en caché
+        """
         
         cache_key = self._generate_cache_key(
             df, analysis_type, num_tiers, custom_instructions
@@ -63,13 +94,13 @@ class AnalysisCache:
         if not cache_file.exists():
             return None
         
-        # Verificar TTL
+        # Verificar TTL (Time To Live)
         file_age = datetime.now() - datetime.fromtimestamp(
             cache_file.stat().st_mtime
         )
         
         if file_age > timedelta(hours=self.ttl_hours):
-            # Caché expirado
+            # Caché expirado - eliminarlo
             cache_file.unlink()
             return None
         
@@ -93,7 +124,16 @@ class AnalysisCache:
         custom_instructions: str,
         result: Dict[str, Any]
     ) -> None:
-        """Guarda resultado en caché"""
+        """
+        Guarda resultado en caché
+        
+        Args:
+            df: DataFrame con las keywords
+            analysis_type: Tipo de análisis
+            num_tiers: Número de tiers
+            custom_instructions: Instrucciones personalizadas
+            result: Resultado del análisis a guardar
+        """
         
         cache_key = self._generate_cache_key(
             df, analysis_type, num_tiers, custom_instructions
@@ -118,7 +158,16 @@ class AnalysisCache:
             print(f"⚠️ Error guardando caché: {e}")
     
     def clear(self, older_than_hours: Optional[int] = None) -> int:
-        """Limpia caché antiguo"""
+        """
+        Limpia caché antiguo
+        
+        Args:
+            older_than_hours: Si se especifica, solo elimina caché más antiguo que esto.
+                            Si es None, elimina todo el caché.
+        
+        Returns:
+            Número de archivos eliminados
+        """
         
         deleted = 0
         
@@ -139,7 +188,12 @@ class AnalysisCache:
         return deleted
     
     def get_stats(self) -> Dict[str, Any]:
-        """Obtiene estadísticas del caché"""
+        """
+        Obtiene estadísticas del caché
+        
+        Returns:
+            Diccionario con estadísticas del caché
+        """
         
         cache_files = list(self.cache_dir.glob("*.json"))
         
@@ -167,115 +221,62 @@ class AnalysisCache:
 
 
 # ============================================
-# CÓMO USAR EN app/main.py
-# ============================================
-
-"""
-# 1. Importar al inicio de app/main.py
-from app.utils.cache import AnalysisCache
-
-# 2. Inicializar (después de st.set_page_config)
-if 'cache' not in st.session_state:
-    st.session_state.cache = AnalysisCache(
-        cache_dir="cache",
-        ttl_hours=24  # Caché válido por 24 horas
-    )
-
-# 3. En la sidebar, añadir stats de caché
-with st.sidebar:
-    with st.expander("💾 Estado del Caché"):
-        stats = st.session_state.cache.get_stats()
-        st.metric("Análisis guardados", stats['total_cached'])
-        st.metric("Espacio usado", f"{stats['total_size_mb']} MB")
-        
-        if st.button("🗑️ Limpiar caché antiguo"):
-            deleted = st.session_state.cache.clear(older_than_hours=24)
-            st.success(f"✅ {deleted} análisis eliminados")
-
-# 4. ANTES de llamar a la API, buscar en caché
-if st.button("🚀 Analizar con IA"):
-    
-    # Intentar recuperar del caché
-    cached_result = st.session_state.cache.get(
-        df=df,
-        analysis_type=analysis_type,
-        num_tiers=num_tiers,
-        custom_instructions=custom_instructions
-    )
-    
-    if cached_result:
-        # ¡Encontrado! No gastar créditos
-        st.info("💾 Resultado recuperado del caché (no se gastaron créditos)")
-        result = cached_result['result']
-        
-    else:
-        # No en caché, hacer análisis nuevo
-        with st.spinner("🧠 Analizando..."):
-            # ... tu código actual de análisis ...
-            result = anthropic_service.analyze_keywords(prompt, df)
-            
-            # Guardar en caché para próxima vez
-            st.session_state.cache.set(
-                df=df,
-                analysis_type=analysis_type,
-                num_tiers=num_tiers,
-                custom_instructions=custom_instructions,
-                result=result
-            )
-    
-    # Continuar normalmente...
-    st.session_state.keyword_universe = result
-"""
-
-
-# ============================================
-# EJEMPLO DE USO STANDALONE
+# EJEMPLO DE USO
 # ============================================
 
 def example_usage():
-    """Ejemplo de cómo usar el caché"""
+    """Ejemplo de cómo usar el sistema de caché"""
     
-    # Crear caché
+    # Crear instancia de caché
     cache = AnalysisCache(cache_dir="cache", ttl_hours=24)
     
     # Datos de ejemplo
     df = pd.DataFrame({
-        'keyword': ['seo tools', 'keyword research'],
-        'volume': [10000, 8000]
+        'keyword': ['seo tools', 'keyword research', 'backlink checker'],
+        'volume': [10000, 8000, 5000]
     })
     
-    # Intentar recuperar
+    # Intentar recuperar del caché
     result = cache.get(
         df=df,
-        analysis_type="Temática",
+        analysis_type="Temática (Topics)",
         num_tiers=3,
         custom_instructions=""
     )
     
     if result:
-        print("✅ Encontrado en caché!")
+        print("✅ ¡Encontrado en caché! No se gastaron créditos.")
+        print(f"Resultado: {result['result']}")
     else:
-        print("❌ No en caché, hacer análisis...")
+        print("❌ No en caché. Realizar análisis nuevo...")
         
-        # Simular análisis
+        # Simular análisis con IA
         result = {
             'summary': 'Análisis de ejemplo',
-            'topics': []
+            'topics': [
+                {'topic': 'SEO Tools', 'tier': 1, 'volume': 10000}
+            ]
         }
         
-        # Guardar
+        # Guardar en caché para próxima vez
         cache.set(
             df=df,
-            analysis_type="Temática",
+            analysis_type="Temática (Topics)",
             num_tiers=3,
             custom_instructions="",
             result=result
         )
         print("💾 Guardado en caché")
     
-    # Ver stats
+    # Ver estadísticas
     stats = cache.get_stats()
-    print(f"\n📊 Stats: {stats}")
+    print(f"\n📊 Estadísticas del caché:")
+    print(f"  - Análisis guardados: {stats['total_cached']}")
+    print(f"  - Espacio usado: {stats['total_size_mb']} MB")
+    
+    # Limpiar caché antiguo (>24h)
+    deleted = cache.clear(older_than_hours=24)
+    print(f"\n🗑️ Archivos eliminados: {deleted}")
 
 
 if __name__ == "__main__":
