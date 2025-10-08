@@ -44,6 +44,66 @@ class CacheManager:
         
         return f"{timestamp}_{content_hash}"
     
+    def _generate_cache_key(self, data_hash: str, analysis_type: str, num_tiers: int) -> str:
+        """
+        Genera una clave única para identificar un análisis específico
+        
+        Args:
+            data_hash: Hash de los datos
+            analysis_type: Tipo de análisis (Temática, Intención, Funnel)
+            num_tiers: Número de tiers
+        
+        Returns:
+            Clave única para el análisis
+        """
+        key_str = f"{data_hash}_{analysis_type}_{num_tiers}"
+        return hashlib.md5(key_str.encode()).hexdigest()[:16]
+    
+    def get_data_hash(self, df) -> str:
+        """
+        Genera un hash único de un DataFrame para identificarlo
+        
+        Args:
+            df: DataFrame con keywords
+        
+        Returns:
+            Hash único del dataset
+        """
+        if df is None or len(df) == 0:
+            return "empty"
+        
+        # Usar las primeras 100 keywords ordenadas + volumen total como identificador
+        sample = df.nlargest(100, 'volume')[['keyword', 'volume']].to_dict('records')
+        sample_str = json.dumps(sample, sort_keys=True)
+        return hashlib.md5(sample_str.encode()).hexdigest()[:16]
+    
+    def find_cached_analysis(
+        self, 
+        data_hash: str, 
+        analysis_type: str, 
+        num_tiers: int
+    ) -> Optional[str]:
+        """
+        Busca si existe un análisis en caché para estos parámetros
+        
+        Args:
+            data_hash: Hash del dataset
+            analysis_type: Tipo de análisis
+            num_tiers: Número de tiers
+        
+        Returns:
+            ID del análisis si existe, None si no
+        """
+        cache_key = self._generate_cache_key(data_hash, analysis_type, num_tiers)
+        
+        # Buscar en el índice
+        for item in self.index:
+            item_metadata = item.get('metadata', {})
+            if item_metadata.get('cache_key') == cache_key:
+                return item['id']
+        
+        return None
+    
     def save_analysis(
         self,
         keyword_universe: Dict[str, Any],
