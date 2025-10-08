@@ -4,7 +4,7 @@ Servicios de integración con APIs externas
 
 from app.services.anthropic_service import AnthropicService
 from app.services.semrush_service import SemrushService
-from app.services.architecture_service import WebArchitectureService
+from app.services.architecture_service import ArchitectureService
 
 # OpenAI es opcional, solo importar si existe
 try:
@@ -13,11 +13,11 @@ try:
         'AnthropicService',
         'SemrushService',
         'OpenAIService',
-        'WebArchitectureService',
+        'ArchitectureService',
     ]
 except ImportError:
     __all__ = [
         'AnthropicService',
         'SemrushService',
-        'WebArchitectureService',
+        'ArchitectureService',
     ]
