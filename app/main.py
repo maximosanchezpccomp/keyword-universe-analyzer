@@ -14,6 +14,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from app.services.anthropic_service import AnthropicService
 from app.services.semrush_service import SemrushService
+from app.services.architecture_service import WebArchitectureService
 from app.components.data_processor import DataProcessor
 from app.components.visualizer import KeywordVisualizer
 from app.utils.helpers import export_to_excel, calculate_metrics, format_number
