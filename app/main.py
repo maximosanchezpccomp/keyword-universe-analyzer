@@ -488,6 +488,55 @@ def main():
                 st.rerun()
         
         st.divider()
+
+        # Widget de Progreso de Análisis
+        with st.expander("📊 Progreso de Informes", expanded=True):
+            st.markdown("### Estado del Informe Completo")
+            
+            completed, total = get_analysis_progress()
+            
+            # Barra de progreso
+            progress_percentage = completed / total if total > 0 else 0
+            st.progress(progress_percentage)
+            
+            # Métricas
+            col_prog1, col_prog2 = st.columns(2)
+            with col_prog1:
+                st.metric("Completados", f"{completed}/{total}")
+            with col_prog2:
+                if completed == total:
+                    st.metric("Estado", "✅ Listo")
+                else:
+                    st.metric("Pendientes", f"{total - completed}")
+            
+            st.caption(f"**{int(progress_percentage * 100)}%** del informe completo")
+            
+            # Lista de análisis con estado
+            st.markdown("#### Análisis Disponibles")
+            
+            for analysis_type, analysis_data in st.session_state.multi_analyses.items():
+                col_status, col_name = st.columns([1, 5])
+                
+                with col_status:
+                    if analysis_data:
+                        st.markdown("✅")
+                    else:
+                        st.markdown("⏳")
+                
+                with col_name:
+                    if analysis_data:
+                        topics_count = len(analysis_data.get('topics', []))
+                        st.markdown(f"**{analysis_type}** ({topics_count} topics)")
+                    else:
+                        st.markdown(f"**{analysis_type}**")
+            
+            # Botón de reset (solo si hay alguno completado)
+            if completed > 0:
+                st.markdown("---")
+                if st.button("🔄 Reiniciar Todos los Análisis", key="reset_all_analyses"):
+                    reset_multi_analyses()
+                    st.success("✅ Análisis reiniciados")
+                    st.rerun()
         
         # Info
         st.info("💡 **Tip:** Sube archivos CSV o Excel de Ahrefs, Semrush o similar con columnas: keyword, volume, traffic")
