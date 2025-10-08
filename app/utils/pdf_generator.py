@@ -1,5 +1,5 @@
 """
-Generador de PDF profesional para informes completos de análisis de keywords
+Generador de PDFs profesionales para Keyword Universe Analyzer
 """
 
 from reportlab.lib import colors
@@ -7,42 +7,42 @@ from reportlab.lib.pagesizes import A4, letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch, cm
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, 
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
     PageBreak, Image, KeepTogether
 )
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
+from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT, TA_JUSTIFY
 from reportlab.pdfgen import canvas
 from datetime import datetime
 import pandas as pd
-from typing import Dict, List, Any
+from typing import Dict, Any, List
 import io
-import plotly.graph_objects as go
-from PIL import Image as PILImage
-import tempfile
 import os
+from pathlib import Path
 
-class PDFReportGenerator:
-    """Generador de informes PDF profesionales con múltiples análisis"""
-    
-    # Colores corporativos PC Componentes
-    PC_ORANGE = colors.HexColor('#FF6000')
-    PC_BLUE_DARK = colors.HexColor('#090029')
-    PC_BLUE_MEDIUM = colors.HexColor('#170453')
-    PC_WHITE = colors.white
+class PDFGenerator:
+    """Generador de informes PDF profesionales con branding PC Componentes"""
     
     def __init__(self):
+        # Colores PC Componentes
+        self.pc_orange = colors.HexColor('#FF6000')
+        self.pc_blue_dark = colors.HexColor('#090029')
+        self.pc_blue_medium = colors.HexColor('#170453')
+        self.pc_blue_light = colors.HexColor('#51437E')
+        self.pc_gray = colors.HexColor('#999999')
+        
+        # Configurar estilos
         self.styles = getSampleStyleSheet()
-        self._create_custom_styles()
+        self._setup_custom_styles()
     
-    def _create_custom_styles(self):
-        """Crea estilos personalizados para el PDF"""
+    def _setup_custom_styles(self):
+        """Configura estilos personalizados"""
         
         # Título principal
         self.styles.add(ParagraphStyle(
             name='CustomTitle',
             parent=self.styles['Heading1'],
             fontSize=24,
-            textColor=self.PC_ORANGE,
+            textColor=self.pc_blue_dark,
             spaceAfter=30,
             alignment=TA_CENTER,
             fontName='Helvetica-Bold'
@@ -53,18 +53,21 @@ class PDFReportGenerator:
             name='Chapter',
             parent=self.styles['Heading1'],
             fontSize=20,
-            textColor=self.PC_BLUE_DARK,
+            textColor=self.pc_orange,
             spaceAfter=20,
             spaceBefore=20,
-            fontName='Helvetica-Bold'
+            fontName='Helvetica-Bold',
+            borderColor=self.pc_orange,
+            borderWidth=2,
+            borderPadding=10
         ))
         
-        # Subcapítulo
+        # Subtítulo
         self.styles.add(ParagraphStyle(
-            name='SubChapter',
+            name='CustomHeading2',
             parent=self.styles['Heading2'],
             fontSize=16,
-            textColor=self.PC_BLUE_MEDIUM,
+            textColor=self.pc_blue_medium,
             spaceAfter=12,
             spaceBefore=12,
             fontName='Helvetica-Bold'
@@ -75,451 +78,487 @@ class PDFReportGenerator:
             name='CustomBody',
             parent=self.styles['BodyText'],
             fontSize=11,
+            textColor=self.pc_blue_dark,
+            spaceAfter=12,
             alignment=TA_JUSTIFY,
-            spaceAfter=12
+            fontName='Helvetica'
         ))
         
-        # Resumen ejecutivo
+        # Destacado
         self.styles.add(ParagraphStyle(
-            name='ExecutiveSummary',
+            name='Highlight',
             parent=self.styles['BodyText'],
-            fontSize=11,
-            alignment=TA_JUSTIFY,
-            leftIndent=20,
-            rightIndent=20,
+            fontSize=12,
+            textColor=self.pc_orange,
             spaceAfter=12,
-            backColor=colors.HexColor('#F5F5F5')
+            fontName='Helvetica-Bold'
         ))
     
     def generate_complete_report(
         self,
-        analyses: Dict[str, Dict],
-        metadata: Dict[str, Any],
+        analyses: Dict[str, Any],
         output_path: str = None
     ) -> bytes:
         """
-        Genera el informe PDF completo con todos los análisis
+        Genera un informe completo con todos los análisis
         
         Args:
-            analyses: Dict con los análisis completados
-                     {'Temática': {...}, 'Intención': {...}, 'Funnel': {...}}
-            metadata: Información general del informe
-            output_path: Ruta donde guardar (opcional)
+            analyses: Diccionario con los análisis {tipo: resultado}
+            output_path: Ruta para guardar el PDF (opcional)
         
         Returns:
-            PDF como bytes
+            Bytes del PDF generado
         """
         
-        # Crear buffer o archivo
-        if output_path:
-            pdf_file = output_path
-        else:
-            pdf_file = io.BytesIO()
+        # Crear buffer
+        buffer = io.BytesIO()
         
         # Crear documento
-        doc = SimpleDocTemplate(
-            pdf_file,
-            pagesize=A4,
-            rightMargin=2*cm,
-            leftMargin=2*cm,
-            topMargin=2*cm,
-            bottomMargin=2*cm
-        )
+        if output_path:
+            doc = SimpleDocTemplate(output_path, pagesize=A4)
+        else:
+            doc = SimpleDocTemplate(buffer, pagesize=A4)
         
-        # Contenido del PDF
-        story = []
+        # Contenedor de elementos
+        elements = []
         
         # Portada
-        story.extend(self._create_cover_page(metadata, analyses))
-        story.append(PageBreak())
+        elements.extend(self._create_cover_page(analyses))
+        elements.append(PageBreak())
         
         # Índice
-        story.extend(self._create_table_of_contents(analyses))
-        story.append(PageBreak())
+        elements.extend(self._create_index(analyses))
+        elements.append(PageBreak())
         
-        # Resumen ejecutivo general
-        story.extend(self._create_executive_summary(analyses, metadata))
-        story.append(PageBreak())
+        # Resumen Ejecutivo
+        elements.extend(self._create_executive_summary(analyses))
+        elements.append(PageBreak())
         
-        # Capítulos de análisis
+        # Capítulos por tipo de análisis
         chapter_num = 1
-        for analysis_type, analysis_data in analyses.items():
-            if analysis_data:  # Solo incluir si existe el análisis
-                story.extend(self._create_analysis_chapter(
-                    chapter_num,
-                    analysis_type,
-                    analysis_data,
-                    metadata
-                ))
-                story.append(PageBreak())
-                chapter_num += 1
         
-        # Capítulo de oportunidades consolidadas
-        story.extend(self._create_opportunities_chapter(analyses))
-        story.append(PageBreak())
+        if 'thematic' in analyses:
+            elements.extend(self._create_analysis_chapter(
+                analyses['thematic'],
+                chapter_num,
+                "Análisis Temático",
+                "Agrupación de keywords por temas y subtemas semánticos"
+            ))
+            elements.append(PageBreak())
+            chapter_num += 1
         
-        # Conclusiones y próximos pasos
-        story.extend(self._create_conclusions(analyses, metadata))
+        if 'intent' in analyses:
+            elements.extend(self._create_analysis_chapter(
+                analyses['intent'],
+                chapter_num,
+                "Análisis de Intención de Búsqueda",
+                "Clasificación según la intención del usuario (Informacional, Comercial, Transaccional)"
+            ))
+            elements.append(PageBreak())
+            chapter_num += 1
         
-        # Generar PDF
-        doc.build(story, onFirstPage=self._add_header_footer, 
-                  onLaterPages=self._add_header_footer)
+        if 'funnel' in analyses:
+            elements.extend(self._create_analysis_chapter(
+                analyses['funnel'],
+                chapter_num,
+                "Análisis de Funnel de Conversión",
+                "Distribución por etapas del customer journey (TOFU, MOFU, BOFU)"
+            ))
+            elements.append(PageBreak())
+            chapter_num += 1
         
-        # Retornar bytes si es BytesIO
-        if isinstance(pdf_file, io.BytesIO):
-            pdf_file.seek(0)
-            return pdf_file.getvalue()
+        # Capítulo final: Consolidado de Oportunidades
+        elements.extend(self._create_opportunities_chapter(analyses, chapter_num))
+        
+        # Construir PDF
+        doc.build(elements, onFirstPage=self._add_header_footer,
+                 onLaterPages=self._add_header_footer)
+        
+        # Si no hay output_path, retornar bytes
+        if not output_path:
+            buffer.seek(0)
+            return buffer.getvalue()
         
         return None
     
-    def _create_cover_page(self, metadata: Dict, analyses: Dict) -> List:
+    def _create_cover_page(self, analyses: Dict[str, Any]) -> List:
         """Crea la portada del informe"""
-        
         elements = []
         
-        # Espaciado inicial
-        elements.append(Spacer(1, 3*cm))
+        # Logo (si existe)
+        if os.path.exists("assets/pc_logo.png"):
+            try:
+                logo = Image("assets/pc_logo.png", width=3*inch, height=1*inch)
+                logo.hAlign = 'CENTER'
+                elements.append(logo)
+                elements.append(Spacer(1, 0.5*inch))
+            except:
+                pass
         
-        # Título principal
+        # Título
         title = Paragraph(
-            "KEYWORD UNIVERSE ANALYZER",
+            "Keyword Universe Analyzer<br/>Informe Completo de Análisis SEO",
             self.styles['CustomTitle']
         )
         elements.append(title)
-        elements.append(Spacer(1, 0.5*cm))
+        elements.append(Spacer(1, 0.3*inch))
         
-        # Subtítulo
+        # Subtítulo con fecha
         subtitle = Paragraph(
-            "Informe Completo de Análisis SEO",
-            self.styles['Heading2']
+            f"Generado el {datetime.now().strftime('%d de %B de %Y')}",
+            self.styles['CustomHeading2']
         )
         elements.append(subtitle)
-        elements.append(Spacer(1, 2*cm))
+        elements.append(Spacer(1, 1*inch))
         
-        # Información del proyecto
-        project_info = f"""
-        <b>Proyecto:</b> {metadata.get('project_name', 'Sin nombre')}<br/>
-        <b>Fecha:</b> {datetime.now().strftime('%d/%m/%Y')}<br/>
-        <b>Keywords analizadas:</b> {metadata.get('total_keywords', 0):,}<br/>
-        <b>Volumen total:</b> {metadata.get('total_volume', 0):,}<br/>
-        <b>Análisis realizados:</b> {len([a for a in analyses.values() if a])} de 3
-        """
+        # Resumen de análisis incluidos
+        analysis_names = {
+            'thematic': 'Análisis Temático',
+            'intent': 'Análisis de Intención de Búsqueda',
+            'funnel': 'Análisis de Funnel de Conversión'
+        }
         
-        info_para = Paragraph(project_info, self.styles['CustomBody'])
-        elements.append(info_para)
-        elements.append(Spacer(1, 2*cm))
+        included = [analysis_names[k] for k in analyses.keys() if k in analysis_names]
         
-        # Logo placeholder
-        logo_text = Paragraph(
-            "<b>Powered by PC Componentes</b>",
-            self.styles['Heading3']
-        )
-        elements.append(logo_text)
+        if included:
+            elements.append(Paragraph(
+                "<b>Análisis Incluidos:</b>",
+                self.styles['CustomHeading2']
+            ))
+            
+            for analysis in included:
+                elements.append(Paragraph(
+                    f"✓ {analysis}",
+                    self.styles['CustomBody']
+                ))
+        
+        # Powered by
+        elements.append(Spacer(1, 1.5*inch))
+        elements.append(Paragraph(
+            "Powered by PC Componentes",
+            self.styles['CustomHeading2']
+        ))
         
         return elements
     
-    def _create_table_of_contents(self, analyses: Dict) -> List:
-        """Crea el índice del informe"""
-        
+    def _create_index(self, analyses: Dict[str, Any]) -> List:
+        """Crea el índice del documento"""
         elements = []
         
         elements.append(Paragraph("Índice", self.styles['Chapter']))
-        elements.append(Spacer(1, 0.5*cm))
+        elements.append(Spacer(1, 0.3*inch))
         
+        # Crear tabla de contenidos
         toc_data = [
-            ['Capítulo', 'Título', 'Página']
+            ['Sección', 'Página'],
+            ['Resumen Ejecutivo', '3']
         ]
         
-        page_num = 1
-        
-        # Resumen ejecutivo
-        toc_data.append(['', 'Resumen Ejecutivo', str(page_num)])
-        page_num += 1
-        
-        # Capítulos de análisis
+        page_num = 4
         chapter_num = 1
-        for analysis_type, analysis_data in analyses.items():
-            if analysis_data:
-                toc_data.append([
-                    str(chapter_num),
-                    f'Análisis {analysis_type}',
-                    str(page_num)
-                ])
+        
+        analysis_names = {
+            'thematic': 'Análisis Temático',
+            'intent': 'Análisis de Intención de Búsqueda',
+            'funnel': 'Análisis de Funnel de Conversión'
+        }
+        
+        for key, name in analysis_names.items():
+            if key in analyses:
+                toc_data.append([f"Capítulo {chapter_num}: {name}", str(page_num)])
                 page_num += 1
                 chapter_num += 1
         
-        # Oportunidades
-        toc_data.append([
-            str(chapter_num),
-            'Oportunidades Consolidadas',
-            str(page_num)
-        ])
-        page_num += 1
-        chapter_num += 1
-        
-        # Conclusiones
-        toc_data.append([
-            str(chapter_num),
-            'Conclusiones y Próximos Pasos',
-            str(page_num)
-        ])
+        toc_data.append([f"Capítulo {chapter_num}: Consolidado de Oportunidades", str(page_num)])
         
         # Crear tabla
-        toc_table = Table(toc_data, colWidths=[2*cm, 12*cm, 2*cm])
+        toc_table = Table(toc_data, colWidths=[4.5*inch, 1*inch])
         toc_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), self.PC_BLUE_DARK),
+            ('BACKGROUND', (0, 0), (-1, 0), self.pc_blue_medium),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('ALIGN', (2, 0), (2, -1), 'CENTER'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 12),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F5F5F5')])
+            ('GRID', (0, 0), (-1, -1), 1, self.pc_gray),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey])
         ]))
         
         elements.append(toc_table)
         
         return elements
     
-    def _create_executive_summary(self, analyses: Dict, metadata: Dict) -> List:
-        """Crea el resumen ejecutivo general"""
-        
+    def _create_executive_summary(self, analyses: Dict[str, Any]) -> List:
+        """Crea el resumen ejecutivo"""
         elements = []
         
         elements.append(Paragraph("Resumen Ejecutivo", self.styles['Chapter']))
-        elements.append(Spacer(1, 0.5*cm))
+        elements.append(Spacer(1, 0.2*inch))
         
-        # Estadísticas generales
-        total_topics = sum([
-            len(a.get('topics', [])) for a in analyses.values() if a
-        ])
+        # Recopilar estadísticas generales
+        total_topics = 0
+        total_keywords = 0
+        total_volume = 0
         
-        summary_text = f"""
-        Este informe presenta un análisis completo del universo de keywords con {len([a for a in analyses.values() if a])} 
-        perspectivas diferentes: {', '.join([k for k, v in analyses.items() if v])}.
-        <br/><br/>
-        Se han analizado un total de <b>{metadata.get('total_keywords', 0):,} keywords</b> con un volumen 
-        de búsqueda combinado de <b>{metadata.get('total_volume', 0):,} búsquedas mensuales</b>.
-        <br/><br/>
-        Se han identificado <b>{total_topics} topics</b> distribuidos en diferentes niveles de prioridad 
-        estratégica, desde oportunidades de alto impacto hasta keywords de nicho específico.
-        """
+        for analysis in analyses.values():
+            if isinstance(analysis, dict) and 'topics' in analysis:
+                topics = analysis['topics']
+                total_topics += len(topics)
+                for topic in topics:
+                    total_keywords += topic.get('keyword_count', 0)
+                    total_volume += topic.get('volume', 0)
         
-        elements.append(Paragraph(summary_text, self.styles['ExecutiveSummary']))
-        elements.append(Spacer(1, 1*cm))
+        # Tabla de métricas
+        metrics_data = [
+            ['Métrica', 'Valor'],
+            ['Análisis Realizados', str(len(analyses))],
+            ['Total Topics Identificados', f"{total_topics:,}"],
+            ['Total Keywords Analizadas', f"{total_keywords:,}"],
+            ['Volumen Total Mensual', f"{total_volume:,}"]
+        ]
         
-        # Tabla resumen por análisis
-        if len([a for a in analyses.values() if a]) > 0:
-            elements.append(Paragraph("Resumen por Tipo de Análisis", self.styles['SubChapter']))
-            
-            summary_data = [['Análisis', 'Topics', 'Keywords', 'Volumen']]
-            
-            for analysis_type, analysis_data in analyses.items():
-                if analysis_data:
-                    topics_count = len(analysis_data.get('topics', []))
-                    keywords_sum = sum([t.get('keyword_count', 0) for t in analysis_data.get('topics', [])])
-                    volume_sum = sum([t.get('volume', 0) for t in analysis_data.get('topics', [])])
-                    
-                    summary_data.append([
-                        analysis_type,
-                        str(topics_count),
-                        f"{keywords_sum:,}",
-                        f"{volume_sum:,}"
-                    ])
-            
-            summary_table = Table(summary_data, colWidths=[4*cm, 3*cm, 4*cm, 4*cm])
-            summary_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), self.PC_ORANGE),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 11),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#FFD7BF')])
-            ]))
-            
-            elements.append(summary_table)
+        metrics_table = Table(metrics_data, colWidths=[3*inch, 2.5*inch])
+        metrics_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), self.pc_orange),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('ALIGN', (1, 1), (1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('GRID', (0, 0), (-1, -1), 1, self.pc_gray),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey])
+        ]))
+        
+        elements.append(metrics_table)
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Resumen de cada análisis
+        for key, analysis in analyses.items():
+            if isinstance(analysis, dict) and 'summary' in analysis:
+                analysis_names = {
+                    'thematic': 'Análisis Temático',
+                    'intent': 'Análisis de Intención',
+                    'funnel': 'Análisis de Funnel'
+                }
+                
+                name = analysis_names.get(key, 'Análisis')
+                
+                elements.append(Paragraph(
+                    f"<b>{name}</b>",
+                    self.styles['CustomHeading2']
+                ))
+                
+                # Resumen (primeros 500 caracteres)
+                summary_text = analysis['summary'][:500] + "..." if len(analysis['summary']) > 500 else analysis['summary']
+                
+                elements.append(Paragraph(
+                    summary_text,
+                    self.styles['CustomBody']
+                ))
+                elements.append(Spacer(1, 0.2*inch))
         
         return elements
     
     def _create_analysis_chapter(
-        self, 
+        self,
+        analysis: Dict[str, Any],
         chapter_num: int,
-        analysis_type: str, 
-        analysis_data: Dict,
-        metadata: Dict
+        title: str,
+        description: str
     ) -> List:
-        """Crea un capítulo completo para un análisis"""
-        
+        """Crea un capítulo para un análisis específico"""
         elements = []
         
         # Título del capítulo
-        chapter_title = f"Capítulo {chapter_num}: Análisis {analysis_type}"
-        elements.append(Paragraph(chapter_title, self.styles['Chapter']))
-        elements.append(Spacer(1, 0.5*cm))
+        elements.append(Paragraph(
+            f"Capítulo {chapter_num}: {title}",
+            self.styles['Chapter']
+        ))
+        elements.append(Spacer(1, 0.2*inch))
+        
+        # Descripción
+        elements.append(Paragraph(description, self.styles['CustomBody']))
+        elements.append(Spacer(1, 0.2*inch))
         
         # Resumen del análisis
-        if 'summary' in analysis_data:
-            elements.append(Paragraph("Resumen", self.styles['SubChapter']))
-            summary_text = analysis_data['summary'].replace('\n', '<br/>')
-            elements.append(Paragraph(summary_text, self.styles['CustomBody']))
-            elements.append(Spacer(1, 0.5*cm))
+        if 'summary' in analysis:
+            elements.append(Paragraph(
+                "<b>Resumen del Análisis</b>",
+                self.styles['CustomHeading2']
+            ))
+            elements.append(Paragraph(
+                analysis['summary'],
+                self.styles['CustomBody']
+            ))
+            elements.append(Spacer(1, 0.3*inch))
         
-        # Topics identificados
-        if 'topics' in analysis_data and len(analysis_data['topics']) > 0:
-            elements.append(Paragraph("Topics Identificados", self.styles['SubChapter']))
+        # Topics principales
+        if 'topics' in analysis:
+            elements.append(Paragraph(
+                "<b>Topics Identificados</b>",
+                self.styles['CustomHeading2']
+            ))
+            elements.append(Spacer(1, 0.1*inch))
             
-            topics_df = pd.DataFrame(analysis_data['topics'])
+            topics = analysis['topics']
             
-            # Tabla de topics por tier
-            for tier in sorted(topics_df['tier'].unique()):
-                tier_topics = topics_df[topics_df['tier'] == tier]
+            # Crear tabla de topics por tier
+            for tier in sorted(set(t['tier'] for t in topics)):
+                tier_topics = [t for t in topics if t['tier'] == tier]
                 
-                elements.append(Paragraph(f"Tier {tier}", self.styles['Heading3']))
+                elements.append(Paragraph(
+                    f"<b>Tier {tier} - Prioridad {'Alta' if tier == 1 else 'Media' if tier == 2 else 'Baja'}</b>",
+                    self.styles['Highlight']
+                ))
                 
-                # Crear tabla
+                # Tabla de topics del tier
                 table_data = [['Topic', 'Keywords', 'Volumen', 'Prioridad']]
                 
-                for _, topic in tier_topics.iterrows():
+                for topic in tier_topics[:10]:  # Top 10 por tier
                     table_data.append([
-                        topic.get('topic', 'N/A')[:40],  # Limitar longitud
-                        str(topic.get('keyword_count', 0)),
+                        topic['topic'][:40] + '...' if len(topic['topic']) > 40 else topic['topic'],
+                        f"{topic.get('keyword_count', 0):,}",
                         f"{topic.get('volume', 0):,}",
-                        topic.get('priority', 'N/A')
+                        topic.get('priority', 'medium').upper()
                     ])
                 
-                topic_table = Table(table_data, colWidths=[7*cm, 2.5*cm, 3*cm, 2.5*cm])
-                topic_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), self.PC_BLUE_MEDIUM),
+                topics_table = Table(table_data, colWidths=[2.5*inch, 1*inch, 1.5*inch, 1*inch])
+                topics_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), self.pc_blue_light),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                     ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+                    ('ALIGN', (0, 0), (0, -1), 'LEFT'),
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                     ('FONTSIZE', (0, 0), (-1, -1), 9),
                     ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-                    ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F5F5F5')])
+                    ('GRID', (0, 0), (-1, -1), 0.5, self.pc_gray),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey])
                 ]))
                 
-                elements.append(topic_table)
-                elements.append(Spacer(1, 0.3*cm))
+                elements.append(topics_table)
+                elements.append(Spacer(1, 0.2*inch))
         
-        # Tendencias (si existen)
-        if 'trends' in analysis_data and len(analysis_data['trends']) > 0:
-            elements.append(Spacer(1, 0.5*cm))
-            elements.append(Paragraph("Tendencias Identificadas", self.styles['SubChapter']))
+        # Gráficos (si existen)
+        if 'chart_path' in analysis:
+            try:
+                chart = Image(analysis['chart_path'], width=5*inch, height=3.5*inch)
+                chart.hAlign = 'CENTER'
+                elements.append(chart)
+                elements.append(Spacer(1, 0.2*inch))
+            except:
+                pass
+        
+        # Gaps y oportunidades
+        if 'gaps' in analysis and analysis['gaps']:
+            elements.append(Paragraph(
+                "<b>Oportunidades de Contenido</b>",
+                self.styles['CustomHeading2']
+            ))
             
-            for trend in analysis_data['trends'][:5]:  # Top 5
-                trend_text = f"""
-                <b>{trend.get('trend', 'N/A')}</b><br/>
-                {trend.get('insight', 'Sin descripción')}
+            for i, gap in enumerate(analysis['gaps'][:5], 1):
+                gap_text = f"""
+                <b>{i}. {gap.get('topic', 'N/A')}</b><br/>
+                Volumen: {gap.get('volume', 0):,} búsquedas/mes<br/>
+                Dificultad: {gap.get('difficulty', 'N/A').upper()}<br/>
+                {gap.get('description', '')}
                 """
-                elements.append(Paragraph(trend_text, self.styles['CustomBody']))
-                elements.append(Spacer(1, 0.2*cm))
+                elements.append(Paragraph(gap_text, self.styles['CustomBody']))
+                elements.append(Spacer(1, 0.1*inch))
         
         return elements
     
-    def _create_opportunities_chapter(self, analyses: Dict) -> List:
-        """Crea el capítulo de oportunidades consolidadas"""
-        
+    def _create_opportunities_chapter(
+        self,
+        analyses: Dict[str, Any],
+        chapter_num: int
+    ) -> List:
+        """Crea el capítulo consolidado de oportunidades"""
         elements = []
         
-        elements.append(Paragraph("Oportunidades Consolidadas", self.styles['Chapter']))
-        elements.append(Spacer(1, 0.5*cm))
+        elements.append(Paragraph(
+            f"Capítulo {chapter_num}: Consolidado de Oportunidades",
+            self.styles['Chapter']
+        ))
+        elements.append(Spacer(1, 0.2*inch))
         
-        intro_text = """
-        Este capítulo consolida todas las oportunidades de contenido identificadas 
-        en los diferentes análisis, priorizadas por impacto potencial y volumen de búsqueda.
-        """
-        elements.append(Paragraph(intro_text, self.styles['CustomBody']))
-        elements.append(Spacer(1, 0.5*cm))
+        elements.append(Paragraph(
+            "Este capítulo consolida todas las oportunidades identificadas en los diferentes análisis, "
+            "priorizadas por volumen de búsqueda y facilidad de implementación.",
+            self.styles['CustomBody']
+        ))
+        elements.append(Spacer(1, 0.3*inch))
         
         # Recopilar todas las oportunidades
         all_opportunities = []
         
-        for analysis_type, analysis_data in analyses.items():
-            if analysis_data and 'gaps' in analysis_data:
-                for gap in analysis_data['gaps']:
-                    opportunity = gap.copy()
-                    opportunity['source_analysis'] = analysis_type
-                    all_opportunities.append(opportunity)
+        for key, analysis in analyses.items():
+            if isinstance(analysis, dict) and 'gaps' in analysis:
+                for gap in analysis['gaps']:
+                    gap['source'] = key
+                    all_opportunities.append(gap)
         
-        if len(all_opportunities) > 0:
-            # Ordenar por volumen
-            all_opportunities.sort(key=lambda x: x.get('volume', 0), reverse=True)
+        # Ordenar por volumen
+        all_opportunities.sort(key=lambda x: x.get('volume', 0), reverse=True)
+        
+        if all_opportunities:
+            # Tabla de oportunidades
+            table_data = [['#', 'Oportunidad', 'Volumen', 'Dificultad', 'Fuente']]
             
-            # Crear tabla
-            opp_data = [['#', 'Oportunidad', 'Volumen', 'Fuente', 'Dificultad']]
+            analysis_names = {
+                'thematic': 'Temático',
+                'intent': 'Intención',
+                'funnel': 'Funnel'
+            }
             
-            for idx, opp in enumerate(all_opportunities[:20], 1):  # Top 20
-                opp_data.append([
-                    str(idx),
-                    opp.get('topic', 'N/A')[:35],
+            for i, opp in enumerate(all_opportunities[:20], 1):  # Top 20
+                table_data.append([
+                    str(i),
+                    opp.get('topic', 'N/A')[:35] + '...' if len(opp.get('topic', '')) > 35 else opp.get('topic', 'N/A'),
                     f"{opp.get('volume', 0):,}",
-                    opp.get('source_analysis', 'N/A'),
-                    opp.get('difficulty', 'N/A')
+                    opp.get('difficulty', 'N/A').upper(),
+                    analysis_names.get(opp.get('source', ''), 'N/A')
                 ])
             
-            opp_table = Table(opp_data, colWidths=[1*cm, 7*cm, 3*cm, 3*cm, 2*cm])
+            opp_table = Table(table_data, colWidths=[0.4*inch, 2.5*inch, 1.2*inch, 1*inch, 0.9*inch])
             opp_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), self.PC_ORANGE),
+                ('BACKGROUND', (0, 0), (-1, 0), self.pc_orange),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                 ('ALIGN', (0, 0), (0, -1), 'CENTER'),
-                ('ALIGN', (2, 0), (2, -1), 'CENTER'),
+                ('ALIGN', (2, 0), (2, -1), 'RIGHT'),
+                ('ALIGN', (3, 0), (-1, -1), 'CENTER'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
                 ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#FFF3E0')])
+                ('GRID', (0, 0), (-1, -1), 0.5, self.pc_gray),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey])
             ]))
             
             elements.append(opp_table)
+            elements.append(Spacer(1, 0.3*inch))
+            
+            # Detalles de top 5
+            elements.append(Paragraph(
+                "<b>Top 5 Oportunidades - Análisis Detallado</b>",
+                self.styles['CustomHeading2']
+            ))
+            
+            for i, opp in enumerate(all_opportunities[:5], 1):
+                detail_text = f"""
+                <b>{i}. {opp.get('topic', 'N/A')}</b><br/>
+                Volumen estimado: {opp.get('volume', 0):,} búsquedas mensuales<br/>
+                Nivel de dificultad: {opp.get('difficulty', 'N/A').upper()}<br/>
+                Fuente: Análisis {analysis_names.get(opp.get('source', ''), 'N/A')}<br/><br/>
+                {opp.get('description', 'Sin descripción disponible')}
+                """
+                elements.append(Paragraph(detail_text, self.styles['CustomBody']))
+                elements.append(Spacer(1, 0.2*inch))
         else:
             elements.append(Paragraph(
-                "No se identificaron gaps de contenido en los análisis realizados.",
+                "No se identificaron oportunidades específicas en los análisis realizados.",
                 self.styles['CustomBody']
             ))
-        
-        return elements
-    
-    def _create_conclusions(self, analyses: Dict, metadata: Dict) -> List:
-        """Crea el capítulo de conclusiones"""
-        
-        elements = []
-        
-        elements.append(Paragraph("Conclusiones y Próximos Pasos", self.styles['Chapter']))
-        elements.append(Spacer(1, 0.5*cm))
-        
-        # Resumen de hallazgos
-        total_topics = sum([len(a.get('topics', [])) for a in analyses.values() if a])
-        
-        conclusion_text = f"""
-        El análisis completo ha revelado <b>{total_topics} topics estratégicos</b> distribuidos 
-        en {len([a for a in analyses.values() if a])} perspectivas complementarias.
-        <br/><br/>
-        <b>Recomendaciones principales:</b><br/>
-        1. Priorizar contenido para topics de Tier 1 identificados<br/>
-        2. Desarrollar estrategia de contenido por intención de usuario<br/>
-        3. Crear flujo de contenido según el funnel de conversión<br/>
-        4. Capitalizar oportunidades identificadas en gaps de contenido<br/>
-        5. Monitorear tendencias emergentes para ajustar estrategia
-        """
-        
-        elements.append(Paragraph(conclusion_text, self.styles['CustomBody']))
-        elements.append(Spacer(1, 1*cm))
-        
-        # Información del informe
-        footer_text = f"""
-        <b>Informe generado el:</b> {datetime.now().strftime('%d/%m/%Y %H:%M')}<br/>
-        <b>Herramienta:</b> Keyword Universe Analyzer<br/>
-        <b>Powered by:</b> PC Componentes
-        """
-        
-        elements.append(Paragraph(footer_text, self.styles['CustomBody']))
         
         return elements
     
@@ -527,31 +566,41 @@ class PDFReportGenerator:
         """Añade header y footer a cada página"""
         canvas.saveState()
         
-        # Header
-        canvas.setFont('Helvetica-Bold', 10)
-        canvas.setFillColor(self.PC_BLUE_DARK)
-        canvas.drawString(2*cm, A4[1] - 1.5*cm, "Keyword Universe Analyzer")
+        # Footer
+        footer_text = f"Keyword Universe Analyzer - PC Componentes | Página {doc.page}"
+        canvas.setFont('Helvetica', 9)
+        canvas.setFillColor(self.pc_gray)
+        canvas.drawCentredString(A4[0] / 2, 0.5 * inch, footer_text)
         
         # Línea decorativa
-        canvas.setStrokeColor(self.PC_ORANGE)
+        canvas.setStrokeColor(self.pc_orange)
         canvas.setLineWidth(2)
-        canvas.line(2*cm, A4[1] - 1.7*cm, A4[0] - 2*cm, A4[1] - 1.7*cm)
-        
-        # Footer
-        canvas.setFont('Helvetica', 8)
-        canvas.setFillColor(colors.grey)
-        canvas.drawString(
-            2*cm, 
-            1.5*cm, 
-            f"Generado el {datetime.now().strftime('%d/%m/%Y')}"
-        )
-        
-        # Número de página
-        page_num = canvas.getPageNumber()
-        canvas.drawRightString(
-            A4[0] - 2*cm,
-            1.5*cm,
-            f"Página {page_num}"
-        )
+        canvas.line(inch, A4[1] - 0.5*inch, A4[0] - inch, A4[1] - 0.5*inch)
         
         canvas.restoreState()
+    
+    def save_chart_as_image(self, fig, filename: str) -> str:
+        """
+        Guarda un gráfico de Plotly como imagen
+        
+        Args:
+            fig: Figura de Plotly
+            filename: Nombre del archivo
+        
+        Returns:
+            Ruta del archivo guardado
+        """
+        try:
+            # Crear directorio temporal si no existe
+            temp_dir = Path("outputs/temp_charts")
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            
+            filepath = temp_dir / filename
+            
+            # Guardar como imagen estática
+            fig.write_image(str(filepath), format='png', width=800, height=600)
+            
+            return str(filepath)
+        except Exception as e:
+            print(f"Error guardando gráfico: {e}")
+            return None
