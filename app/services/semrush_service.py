@@ -213,6 +213,7 @@ class SemrushService:
             'Search Volume': 'volume',
             'CPC': 'cpc',
             'URL': 'url',
+            'Url': 'url', 
             'Traffic': 'traffic',
             'Traffic (%)': 'traffic_pct',
             'Traffic Cost': 'traffic_cost',
@@ -221,6 +222,21 @@ class SemrushService:
         }
         
         df = df.rename(columns=column_mapping)
+
+        # Renombrar solo las columnas que existen
+        existing_mappings = {k: v for k, v in column_mapping.items() if k in df.columns}
+        df = df.rename(columns=existing_mappings)
+
+        # Añadir columnas faltantes con valores por defecto
+        required_columns = ['keyword', 'volume', 'position', 'traffic', 'url']
+        for col in required_columns:
+            if col not in df.columns:
+                if col == 'url':
+                    df['url'] = ''
+                elif col in ['volume', 'position', 'traffic']:
+                    df[col] = 0
+                else:
+                    df[col] = 'N/A'
         
         # Convertir tipos
         numeric_columns = ['position', 'prev_position', 'position_diff', 
