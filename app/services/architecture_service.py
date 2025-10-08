@@ -1,241 +1,269 @@
 """
-Servicio para generar arquitectura web basada en análisis de keywords
+Servicio para generar arquitectura de contenido web basada en análisis de keywords
 """
 
-from typing import Dict, List, Any, Optional
+from openai import OpenAI
+from anthropic import Anthropic
 import pandas as pd
 import json
+from typing import Dict, List, Any, Optional
 
-
-class WebArchitectureService:
-    """Genera propuestas de arquitectura web basadas en análisis de keywords"""
+class ArchitectureService:
+    """Servicio para generar arquitecturas de sitios web basadas en keyword analysis"""
     
-    def __init__(self, anthropic_service=None, openai_service=None):
-        """
-        Inicializa el servicio con los proveedores de IA disponibles
-        
-        Args:
-            anthropic_service: Instancia de AnthropicService
-            openai_service: Instancia de OpenAIService
-        """
-        self.anthropic_service = anthropic_service
-        self.openai_service = openai_service
-    
-    def create_architecture_prompt(
-        self,
-        analysis_results: List[Dict[str, Any]],
-        df: pd.DataFrame,
-        custom_instructions: str = ""
-    ) -> str:
-        """
-        Crea el prompt para generar la arquitectura web
-        
-        Args:
-            analysis_results: Lista de resultados de análisis previos
-            df: DataFrame con todas las keywords
-            custom_instructions: Instrucciones adicionales del usuario
-        """
-        
-        # Extraer insights de todos los análisis
-        all_topics = []
-        analysis_summaries = []
-        
-        for i, analysis in enumerate(analysis_results, 1):
-            analysis_summaries.append(f"**Análisis {i}:** {analysis.get('summary', 'N/A')}")
-            if 'topics' in analysis:
-                all_topics.extend(analysis['topics'])
-        
-        # Stats globales
-        total_keywords = len(df)
-        total_volume = int(df['volume'].sum())
-        
-        # Top keywords por volumen
-        top_keywords = df.nlargest(100, 'volume')[['keyword', 'volume']].to_dict('records')
-        
-        prompt = f"""Eres un experto en arquitectura de información y SEO. Tu tarea es crear una propuesta de ARQUITECTURA WEB completa basada en múltiples análisis de keywords.
-
-# CONTEXTO GLOBAL
-- Total de keywords analizadas: {total_keywords:,}
-- Volumen total de búsqueda: {total_volume:,}
-- Número de análisis realizados: {len(analysis_results)}
-
-# RESÚMENES DE ANÁLISIS PREVIOS
-{chr(10).join(analysis_summaries)}
-
-# TOPICS IDENTIFICADOS (De todos los análisis)
-{json.dumps(all_topics[:50], indent=2)}
-
-# TOP KEYWORDS POR VOLUMEN
-{json.dumps(top_keywords, indent=2)}
-
-# TU MISIÓN
-Crear una PROPUESTA DE ARQUITECTURA WEB estructurada en:
-
-1. **FAMILIAS**: Categorías principales del sitio web (nivel 1 de navegación)
-2. **SUBFAMILIAS**: Subcategorías dentro de cada familia (nivel 2)
-3. **MARCAS**: Si aplica, agrupaciones por marca/fabricante
-4. **CASOS DE USO**: Agrupaciones por uso/aplicación específica
-
-# CRITERIOS CLAVE
-- Cada familia debe tener coherencia semántica
-- Priorizar por volumen de búsqueda y relevancia estratégica
-- Considerar la intención del usuario en cada nivel
-- Crear una jerarquía lógica y navegable
-- Balancear SEO con usabilidad
-
-{f"# INSTRUCCIONES ADICIONALES\\n{custom_instructions}" if custom_instructions else ""}
-
-# FORMATO DE RESPUESTA (JSON)
-Responde ÚNICAMENTE con un JSON válido con esta estructura:
-
-{{
-    "summary": "Resumen ejecutivo de la arquitectura propuesta (3-4 párrafos explicando la estrategia)",
-    "families": [
-        {{
-            "name": "Nombre de la Familia",
-            "slug": "url-slug",
-            "description": "Descripción detallada de esta familia",
-            "priority": "high|medium|low",
-            "keywords": ["keyword1", "keyword2", "keyword3"],
-            "keyword_count": 250,
-            "total_volume": 500000,
-            "tier": 1,
-            "content_strategy": "Estrategia de contenido recomendada",
-            "subfamilies": [
-                {{
-                    "name": "Nombre de Subfamilia",
-                    "slug": "subfamilia-slug",
-                    "description": "Descripción",
-                    "keywords": ["keyword1", "keyword2"],
-                    "keyword_count": 50,
-                    "total_volume": 100000,
-                    "content_type": "Hub page|Category page|Collection"
-                }}
-            ],
-            "brands": [
-                {{
-                    "name": "Nombre de Marca",
-                    "slug": "marca-slug",
-                    "keywords": ["keyword1", "keyword2"],
-                    "keyword_count": 30,
-                    "total_volume": 50000,
-                    "strategy": "Estrategia para esta marca"
-                }}
-            ],
-            "use_cases": [
-                {{
-                    "name": "Caso de uso",
-                    "slug": "caso-uso-slug",
-                    "description": "Descripción del caso de uso",
-                    "keywords": ["keyword1", "keyword2"],
-                    "keyword_count": 20,
-                    "total_volume": 30000,
-                    "content_type": "Guide|Tutorial|Comparison"
-                }}
-            ]
-        }}
-    ],
-    "url_structure": {{
-        "pattern": "Patrón de URLs recomendado",
-        "examples": [
-            "/familia/subfamilia/producto",
-            "/familia/marca/producto",
-            "/casos-uso/nombre-caso"
-        ]
-    }},
-    "navigation_recommendations": {{
-        "primary_nav": ["Familia 1", "Familia 2", "..."],
-        "secondary_nav": "Recomendaciones para navegación secundaria",
-        "breadcrumbs": "Estructura de breadcrumbs recomendada"
-    }},
-    "internal_linking": {{
-        "strategy": "Estrategia de enlazado interno",
-        "hub_pages": ["Página 1", "Página 2"],
-        "cluster_approach": "Descripción del modelo cluster"
-    }},
-    "content_priorities": [
-        {{
-            "phase": "Fase 1 (0-3 meses)",
-            "families": ["Familia prioritaria 1", "..."],
-            "rationale": "Por qué empezar por aquí"
-        }},
-        {{
-            "phase": "Fase 2 (3-6 meses)",
-            "families": ["Familia 2", "..."],
-            "rationale": "Por qué continuar con esto"
-        }}
-    ],
-    "seo_opportunities": [
-        {{
-            "opportunity": "Descripción de la oportunidad",
-            "potential_volume": 50000,
-            "difficulty": "low|medium|high",
-            "recommendation": "Qué hacer"
-        }}
-    ]
-}}
-
-CRÍTICO: Responde SOLO con el JSON válido, sin texto adicional antes o después."""
-
-        return prompt
+    def __init__(
+        self, 
+        anthropic_key: Optional[str] = None,
+        openai_key: Optional[str] = None,
+        claude_model: str = "claude-sonnet-4-5-20250929",
+        openai_model: str = "gpt-4o"
+    ):
+        self.anthropic_client = Anthropic(api_key=anthropic_key) if anthropic_key else None
+        self.openai_client = OpenAI(api_key=openai_key) if openai_key else None
+        self.claude_model = claude_model
+        self.openai_model = openai_model
+        self.max_tokens = 16000
     
     def generate_architecture(
         self,
-        analysis_results: List[Dict[str, Any]],
+        analysis_results: Dict[str, Any],
         df: pd.DataFrame,
-        provider: str = "claude",
+        provider: str = "Claude",
         custom_instructions: str = ""
     ) -> Dict[str, Any]:
         """
-        Genera la arquitectura web usando el proveedor especificado
+        Genera arquitectura de sitio web basada en análisis de keywords
         
         Args:
-            analysis_results: Lista de análisis previos
-            df: DataFrame con keywords
-            provider: "claude", "openai" o "both"
+            analysis_results: Resultados del análisis de keywords
+            df: DataFrame con las keywords
+            provider: "Claude", "OpenAI", o "Ambos"
             custom_instructions: Instrucciones adicionales
         
         Returns:
-            Diccionario con la arquitectura web propuesta
+            Diccionario con la arquitectura generada
         """
         
-        prompt = self.create_architecture_prompt(analysis_results, df, custom_instructions)
+        # Crear prompt
+        prompt = self._create_architecture_prompt(
+            analysis_results,
+            df,
+            custom_instructions
+        )
         
-        if provider == "claude" and self.anthropic_service:
-            return self._generate_with_claude(prompt)
-        elif provider == "openai" and self.openai_service:
+        # Generar según proveedor
+        if provider == "Claude":
+            if not self.anthropic_client:
+                raise ValueError("Claude API key no configurada")
+            return self._generate_with_claude(prompt, analysis_results, df)
+        
+        elif provider == "OpenAI":
+            if not self.openai_client:
+                raise ValueError("OpenAI API key no configurada")
             return self._generate_with_openai(prompt)
-        elif provider == "both":
+        
+        elif provider == "Ambos":
+            if not self.anthropic_client or not self.openai_client:
+                raise ValueError("Ambas API keys son necesarias para validación cruzada")
             return self._generate_with_both(prompt, analysis_results, df)
+        
         else:
-            raise ValueError(f"Proveedor {provider} no disponible")
+            raise ValueError(f"Proveedor no válido: {provider}")
     
-    def _generate_with_claude(self, prompt: str) -> Dict[str, Any]:
-        """Genera arquitectura usando Claude"""
+    def _create_architecture_prompt(
+        self,
+        analysis_results: Dict[str, Any],
+        df: pd.DataFrame,
+        custom_instructions: str = ""
+    ) -> str:
+        """Crea el prompt para generar arquitectura"""
+        
+        # Extraer topics del análisis
+        topics = analysis_results.get('topics', [])
+        
+        # Crear resumen de topics
+        topics_summary = []
+        for topic in topics[:50]:  # Limitar a top 50 para no exceder tokens
+            topics_summary.append({
+                'topic': topic.get('topic', 'N/A'),
+                'tier': topic.get('tier', 0),
+                'keyword_count': topic.get('keyword_count', 0),
+                'volume': topic.get('volume', 0),
+                'priority': topic.get('priority', 'medium')
+            })
+        
+        prompt = f"""Eres un experto en arquitectura de información y SEO. Tu tarea es crear una arquitectura de sitio web optimizada basada en el análisis de keywords.
+
+# CONTEXTO
+- Total keywords analizadas: {len(df):,}
+- Topics identificados: {len(topics)}
+- Volumen total: {df['volume'].sum():,.0f}
+
+# TOPICS PRINCIPALES
+{json.dumps(topics_summary, indent=2)}
+
+# TU MISIÓN
+Crea una arquitectura de sitio web jerárquica que:
+1. Organice el contenido de forma lógica y SEO-friendly
+2. Establezca una estructura de URL clara
+3. Defina la navegación principal
+4. Identifique páginas pillar y páginas de soporte
+5. Considere la intención del usuario y el customer journey
+
+{custom_instructions}
+
+# FORMATO DE RESPUESTA (CRÍTICO - JSON VÁLIDO)
+Responde ÚNICAMENTE con un JSON válido con esta estructura:
+
+{{
+    "overview": "Resumen ejecutivo de la arquitectura propuesta (2-3 párrafos)",
+    "site_structure": {{
+        "home": {{
+            "title": "Homepage",
+            "description": "Descripción y propósito",
+            "target_keywords": ["keyword1", "keyword2"],
+            "priority": "critical"
+        }},
+        "main_sections": [
+            {{
+                "section_name": "Nombre de la sección",
+                "url_structure": "/section-name",
+                "description": "Propósito de esta sección",
+                "navigation_label": "Label en menú",
+                "target_topics": ["topic1", "topic2"],
+                "estimated_volume": 100000,
+                "page_type": "category|hub|landing",
+                "priority": "high|medium|low",
+                "subsections": [
+                    {{
+                        "name": "Subsección",
+                        "url": "/section-name/subsection",
+                        "description": "Propósito",
+                        "target_keywords": ["keyword1", "keyword2"],
+                        "page_type": "article|guide|comparison"
+                    }}
+                ]
+            }}
+        ]
+    }},
+    "navigation": {{
+        "primary_menu": [
+            {{
+                "label": "Label del menú",
+                "url": "/url",
+                "dropdown": ["Opción 1", "Opción 2"]
+            }}
+        ],
+        "footer_sections": [
+            {{
+                "title": "Título del grupo",
+                "links": ["Link 1", "Link 2"]
+            }}
+        ]
+    }},
+    "content_strategy": {{
+        "pillar_pages": [
+            {{
+                "title": "Título de página pillar",
+                "url": "/url",
+                "target_topics": ["topic1", "topic2"],
+                "estimated_word_count": 3000,
+                "supporting_articles": 10,
+                "priority": "high"
+            }}
+        ],
+        "content_clusters": [
+            {{
+                "cluster_name": "Nombre del cluster",
+                "pillar_page": "/url-pillar",
+                "cluster_articles": [
+                    {{
+                        "title": "Título del artículo",
+                        "url": "/url",
+                        "target_keywords": ["keyword1"],
+                        "word_count": 1500
+                    }}
+                ]
+            }}
+        ]
+    }},
+    "internal_linking": {{
+        "strategy": "Descripción de la estrategia de linking interno",
+        "hub_pages": ["URL 1", "URL 2"],
+        "linking_opportunities": [
+            {{
+                "from": "/page-a",
+                "to": "/page-b",
+                "anchor_text": "texto del enlace",
+                "reason": "por qué este enlace es importante"
+            }}
+        ]
+    }},
+    "implementation_roadmap": [
+        {{
+            "phase": 1,
+            "duration": "1-2 meses",
+            "focus": "Descripción del foco de esta fase",
+            "pages_to_create": 10,
+            "priority_pages": ["URL 1", "URL 2"],
+            "estimated_effort": "80 horas"
+        }}
+    ],
+    "technical_recommendations": [
+        "Recomendación técnica 1",
+        "Recomendación técnica 2"
+    ],
+    "url_naming_conventions": {{
+        "pattern": "Patrón de URLs (ej: /categoria/subcategoria/articulo)",
+        "examples": ["Ejemplo 1", "Ejemplo 2"],
+        "rules": ["Regla 1", "Regla 2"]
+    }}
+}}
+
+CRÍTICO: 
+- Responde SOLO con el JSON, sin texto antes o después
+- Asegúrate de que el JSON es válido y está completo
+- No uses comillas simples, solo comillas dobles
+- No incluyas comentarios en el JSON"""
+
+        return prompt
+    
+    def _generate_with_claude(
+        self, 
+        prompt: str,
+        analysis_results: Dict[str, Any],
+        df: pd.DataFrame
+    ) -> Dict[str, Any]:
+        """Genera arquitectura con Claude"""
         
         try:
-            message = self.anthropic_service.client.messages.create(
-                model=self.anthropic_service.model,
-                max_tokens=16000,
+            message = self.anthropic_client.messages.create(
+                model=self.claude_model,
+                max_tokens=self.max_tokens,
                 temperature=0.3,
-                messages=[{"role": "user", "content": prompt}]
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
             )
             
+            # Extraer contenido
             response_text = message.content[0].text
             
             # Parsear JSON
             try:
                 result = json.loads(response_text)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                # Intentar extraer JSON del texto
                 import re
                 json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
                 if json_match:
                     result = json.loads(json_match.group())
                 else:
-                    raise ValueError("No se pudo extraer JSON válido")
+                    raise ValueError(f"No se pudo extraer JSON válido: {str(e)}")
             
+            # Añadir metadata
             result['provider'] = 'Claude'
-            result['model'] = self.anthropic_service.model
+            result['model'] = self.claude_model
             
             return result
             
@@ -243,23 +271,72 @@ CRÍTICO: Responde SOLO con el JSON válido, sin texto adicional antes o despué
             raise Exception(f"Error generando arquitectura con Claude: {str(e)}")
     
     def _generate_with_openai(self, prompt: str) -> Dict[str, Any]:
-        """Genera arquitectura usando OpenAI"""
+        """Genera arquitectura con OpenAI"""
         
         try:
-            response = self.openai_service.client.chat.completions.create(
-                model=self.openai_service.model,
+            response = self.openai_client.chat.completions.create(
+                model=self.openai_model,
                 messages=[
-                    {"role": "system", "content": "Eres un experto en arquitectura web y SEO."},
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": "Eres un experto en arquitectura de información y SEO. Siempre respondes con JSON válido y completo."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
                 ],
-                max_tokens=16000,
+                max_tokens=self.max_tokens,
                 temperature=0.3,
                 response_format={"type": "json_object"}
             )
             
-            result = json.loads(response.choices[0].message.content)
+            # CRÍTICO: Verificar que hay contenido antes de parsear
+            content = response.choices[0].message.content
+            
+            if content is None or content.strip() == "":
+                # Si no hay contenido, puede ser por:
+                # 1. Contenido filtrado por políticas de OpenAI
+                # 2. Límite de tokens excedido
+                # 3. Error en el modelo
+                
+                finish_reason = response.choices[0].finish_reason
+                
+                if finish_reason == "content_filter":
+                    raise ValueError(
+                        "OpenAI filtró el contenido. "
+                        "Intenta simplificar el prompt o usar menos datos."
+                    )
+                elif finish_reason == "length":
+                    raise ValueError(
+                        "Se alcanzó el límite de tokens. "
+                        "Intenta reducir el número de topics o usar un límite menor."
+                    )
+                else:
+                    raise ValueError(
+                        f"OpenAI devolvió respuesta vacía. "
+                        f"Reason: {finish_reason}. "
+                        "Intenta con menos datos o con Claude."
+                    )
+            
+            # Parsear JSON
+            try:
+                result = json.loads(content)
+            except json.JSONDecodeError as e:
+                # Intentar extraer JSON
+                import re
+                json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                if json_match:
+                    result = json.loads(json_match.group())
+                else:
+                    raise ValueError(
+                        f"No se pudo parsear JSON de OpenAI: {str(e)}\n"
+                        f"Contenido recibido: {content[:500]}..."
+                    )
+            
+            # Añadir metadata
             result['provider'] = 'OpenAI'
-            result['model'] = self.openai_service.model
+            result['model'] = self.openai_model
             
             return result
             
@@ -269,120 +346,133 @@ CRÍTICO: Responde SOLO con el JSON válido, sin texto adicional antes o despué
     def _generate_with_both(
         self,
         prompt: str,
-        analysis_results: List[Dict[str, Any]],
+        analysis_results: Dict[str, Any],
         df: pd.DataFrame
     ) -> Dict[str, Any]:
-        """Genera con ambos proveedores y combina resultados"""
+        """Genera arquitectura con ambos proveedores para validación cruzada"""
         
-        # Generar con Claude
-        claude_result = self._generate_with_claude(prompt)
-        
-        # Generar con OpenAI
-        openai_result = self._generate_with_openai(prompt)
-        
-        # Validación cruzada
-        validation_prompt = f"""Compara estas dos propuestas de arquitectura web y proporciona:
-
-1. Puntos en común (familias/estructuras que ambos identificaron)
-2. Diferencias clave
-3. Fortalezas de cada propuesta
-4. Recomendación final: qué elementos tomar de cada una
-
-PROPUESTA CLAUDE:
-{json.dumps(claude_result.get('families', [])[:10], indent=2)}
-
-PROPUESTA OPENAI:
-{json.dumps(openai_result.get('families', [])[:10], indent=2)}
-
-Responde en JSON:
-{{
-    "comparison": "Análisis comparativo",
-    "common_families": ["Familia 1", "..."],
-    "unique_to_claude": ["Familia X", "..."],
-    "unique_to_openai": ["Familia Y", "..."],
-    "recommendation": "Qué propuesta usar o cómo combinarlas"
-}}"""
-
         try:
-            comparison_response = self.anthropic_service.client.messages.create(
-                model=self.anthropic_service.model,
-                max_tokens=4000,
-                messages=[{"role": "user", "content": validation_prompt}]
-            )
+            # Generar con Claude primero (más confiable)
+            claude_result = self._generate_with_claude(prompt, analysis_results, df)
             
-            comparison = json.loads(comparison_response.content[0].text)
-        except:
-            comparison = {
-                "comparison": "No se pudo realizar la comparación",
-                "recommendation": "Revisar ambas propuestas manualmente"
+            # Generar con OpenAI
+            try:
+                openai_result = self._generate_with_openai(prompt)
+            except Exception as e:
+                # Si OpenAI falla, solo usar Claude pero informar
+                print(f"OpenAI falló, usando solo Claude: {str(e)}")
+                claude_result['validation_note'] = f"OpenAI no disponible: {str(e)}"
+                return claude_result
+            
+            # Combinar resultados
+            combined = {
+                'overview': f"**Análisis de Claude:**\n{claude_result.get('overview', '')}\n\n**Análisis de OpenAI:**\n{openai_result.get('overview', '')}",
+                'site_structure': claude_result.get('site_structure', {}),
+                'site_structure_openai': openai_result.get('site_structure', {}),
+                'navigation': claude_result.get('navigation', {}),
+                'content_strategy': claude_result.get('content_strategy', {}),
+                'internal_linking': claude_result.get('internal_linking', {}),
+                'implementation_roadmap': claude_result.get('implementation_roadmap', []),
+                'technical_recommendations': claude_result.get('technical_recommendations', []),
+                'url_naming_conventions': claude_result.get('url_naming_conventions', {}),
+                'provider': 'Ambos',
+                'models': f"Claude: {self.claude_model} | OpenAI: {self.openai_model}",
+                'validation': self._compare_architectures(claude_result, openai_result)
             }
-        
-        return {
-            'summary': f"**Propuesta Claude:**\n{claude_result.get('summary', '')}\n\n**Propuesta OpenAI:**\n{openai_result.get('summary', '')}",
-            'families': claude_result.get('families', []),
-            'families_openai': openai_result.get('families', []),
-            'comparison': comparison,
-            'url_structure': claude_result.get('url_structure', {}),
-            'navigation_recommendations': claude_result.get('navigation_recommendations', {}),
-            'internal_linking': claude_result.get('internal_linking', {}),
-            'provider': 'Ambos',
-            'models': f"Claude: {claude_result.get('model')} | OpenAI: {openai_result.get('model')}"
-        }
+            
+            return combined
+            
+        except Exception as e:
+            raise Exception(f"Error en validación cruzada: {str(e)}")
     
-    def enrich_architecture_with_keywords(
+    def _compare_architectures(
         self,
-        architecture: Dict[str, Any],
-        df: pd.DataFrame
+        claude_result: Dict[str, Any],
+        openai_result: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """
-        Enriquece la arquitectura asignando keywords específicas a cada elemento
+        """Compara las arquitecturas generadas por ambos proveedores"""
         
-        Args:
-            architecture: Arquitectura generada
-            df: DataFrame con todas las keywords
-        """
+        comparison = {
+            'agreement': 'high',  # high, medium, low
+            'differences': [],
+            'recommendations': []
+        }
         
-        # Este método puede usarse para hacer un segundo paso
-        # donde se asignen keywords específicas a cada familia/subfamilia
-        # basándose en similitud semántica
+        # Comparar número de secciones principales
+        claude_sections = len(claude_result.get('site_structure', {}).get('main_sections', []))
+        openai_sections = len(openai_result.get('site_structure', {}).get('main_sections', []))
         
-        return architecture
+        if abs(claude_sections - openai_sections) > 3:
+            comparison['differences'].append(
+                f"Claude sugiere {claude_sections} secciones, "
+                f"OpenAI sugiere {openai_sections}"
+            )
+            comparison['agreement'] = 'medium'
+        
+        # Comparar fases de implementación
+        claude_phases = len(claude_result.get('implementation_roadmap', []))
+        openai_phases = len(openai_result.get('implementation_roadmap', []))
+        
+        if abs(claude_phases - openai_phases) > 1:
+            comparison['differences'].append(
+                f"Claude sugiere {claude_phases} fases, "
+                f"OpenAI sugiere {openai_phases} fases"
+            )
+        
+        # Generar recomendaciones
+        if comparison['agreement'] == 'high':
+            comparison['recommendations'].append(
+                "Ambos modelos coinciden en la estructura general. "
+                "Puedes proceder con confianza."
+            )
+        else:
+            comparison['recommendations'].append(
+                "Hay diferencias significativas. "
+                "Revisa ambas propuestas y combina lo mejor de cada una."
+            )
+        
+        return comparison
     
-    def export_architecture_to_sitemap(
-        self,
-        architecture: Dict[str, Any],
-        base_url: str = "https://example.com"
-    ) -> str:
-        """
-        Genera un mapa del sitio conceptual basado en la arquitectura
+    def export_to_document(self, architecture: Dict[str, Any]) -> str:
+        """Exporta la arquitectura a un documento markdown"""
         
-        Returns:
-            String con la estructura del sitio
-        """
+        doc = f"""# Arquitectura de Sitio Web
+
+{architecture.get('overview', '')}
+
+## Estructura del Sitio
+
+### Homepage
+{json.dumps(architecture.get('site_structure', {}).get('home', {}), indent=2)}
+
+### Secciones Principales
+"""
         
-        sitemap = [f"# Arquitectura Web Propuesta\n\nBase URL: {base_url}\n"]
-        
-        families = architecture.get('families', [])
-        
-        for family in families:
-            family_slug = family.get('slug', '')
-            sitemap.append(f"\n## 📁 /{family_slug}/ - {family['name']}")
-            sitemap.append(f"   Volume: {family.get('total_volume', 0):,} | Keywords: {family.get('keyword_count', 0)}")
+        for section in architecture.get('site_structure', {}).get('main_sections', []):
+            doc += f"\n#### {section.get('section_name', 'N/A')}\n"
+            doc += f"- **URL:** {section.get('url_structure', 'N/A')}\n"
+            doc += f"- **Tipo:** {section.get('page_type', 'N/A')}\n"
+            doc += f"- **Prioridad:** {section.get('priority', 'N/A')}\n"
+            doc += f"- **Descripción:** {section.get('description', 'N/A')}\n"
             
-            # Subfamilies
-            for subfamily in family.get('subfamilies', []):
-                subfamily_slug = subfamily.get('slug', '')
-                sitemap.append(f"   └─ 📄 /{family_slug}/{subfamily_slug}/ - {subfamily['name']}")
-                sitemap.append(f"      Volume: {subfamily.get('total_volume', 0):,}")
-            
-            # Brands
-            for brand in family.get('brands', []):
-                brand_slug = brand.get('slug', '')
-                sitemap.append(f"   └─ 🏷️ /{family_slug}/marca/{brand_slug}/ - {brand['name']}")
-            
-            # Use cases
-            for use_case in family.get('use_cases', []):
-                case_slug = use_case.get('slug', '')
-                sitemap.append(f"   └─ 💡 /{family_slug}/caso-uso/{case_slug}/ - {use_case['name']}")
+            if section.get('subsections'):
+                doc += "\n**Subsecciones:**\n"
+                for subsection in section['subsections']:
+                    doc += f"- {subsection.get('name', 'N/A')} ({subsection.get('url', 'N/A')})\n"
         
-        return '\n'.join(sitemap)
+        doc += "\n## Navegación\n\n"
+        doc += json.dumps(architecture.get('navigation', {}), indent=2)
+        
+        doc += "\n\n## Estrategia de Contenido\n\n"
+        doc += json.dumps(architecture.get('content_strategy', {}), indent=2)
+        
+        doc += "\n\n## Roadmap de Implementación\n\n"
+        
+        for phase in architecture.get('implementation_roadmap', []):
+            doc += f"\n### Fase {phase.get('phase', 0)}\n"
+            doc += f"- **Duración:** {phase.get('duration', 'N/A')}\n"
+            doc += f"- **Foco:** {phase.get('focus', 'N/A')}\n"
+            doc += f"- **Páginas a crear:** {phase.get('pages_to_create', 0)}\n"
+            doc += f"- **Esfuerzo estimado:** {phase.get('estimated_effort', 'N/A')}\n"
+        
+        return doc
