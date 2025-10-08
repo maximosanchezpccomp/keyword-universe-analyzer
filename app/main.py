@@ -3,9 +3,11 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
+from typing import Dict, List, Any  
 import sys
 import os
 from pathlib import Path
+
 
 # Añadir el directorio raíz al path
 sys.path.append(str(Path(__file__).parent.parent))
