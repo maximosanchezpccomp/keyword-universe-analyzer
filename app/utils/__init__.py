@@ -35,6 +35,7 @@ __all__ = [
     'detect_keyword_patterns',
     'create_content_calendar',
     'validate_dataframe',
+    'CacheManager',
     
     # prompts
     'build_prompt',
