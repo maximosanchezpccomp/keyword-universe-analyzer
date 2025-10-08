@@ -18,6 +18,7 @@ from app.components.data_processor import DataProcessor
 from app.components.visualizer import KeywordVisualizer
 from app.utils.helpers import export_to_excel, calculate_metrics
 from app.utils.cache_manager import CacheManager
+from app.utils.helpers import safe_preview_dataframe
 
 # Importar configuración del logo
 try:
@@ -746,7 +747,7 @@ domain|another-site.com""",
                                         # Preview de datos
                                         with st.expander("👁️ Preview de los datos"):
                                             st.dataframe(
-                                                all_data[['keyword', 'volume', 'traffic', 'position', 'url', 'source_type', 'source']].head(20),
+                                                safe_preview_dataframe(all_data, n=20),
                                                 use_container_width=True
                                             )
                                     else:
