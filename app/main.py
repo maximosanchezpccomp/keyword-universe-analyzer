@@ -764,7 +764,7 @@ domain|another-site.com""",
             
             # Botón de análisis
             if force_new or not cached_analysis_id:
-                if st.button("🚀 Analizar con IA", type="primary", use_container_width=True, disabled=(cached_analysis_id and not force_new)):
+                if st.button("🚀 Analizar con IA", type="primary", use_container_width=True):
                     with st.spinner(f"🧠 {ai_provider.split('(')[0].strip()} está analizando tu universo de keywords..."):
                         try:
                             if ai_provider == "Claude (Anthropic)":
