@@ -1,6 +1,6 @@
 """
-Servicio para integración con OpenAI API
-Alternativa o complemento a Claude para análisis de keywords
+Parche para app/services/openai_service.py
+Añade mejor manejo de errores y validación de respuestas
 """
 
 from openai import OpenAI
@@ -28,13 +28,8 @@ class OpenAIService:
     ) -> List[Dict[str, str]]:
         """Crea los mensajes para OpenAI en formato chat"""
         
-        # Seleccionar solo columnas disponibles
-        columns_to_use = ['keyword', 'volume']
-        if 'traffic' in df.columns:
-            columns_to_use.append('traffic')
-        
         # Preparar datos
-        top_keywords = df.nlargest(1000, 'volume')[columns_to_use].to_dict('records')
+        top_keywords = df.nlargest(1000, 'volume')[['keyword', 'volume', 'traffic']].to_dict('records')
         
         stats = {
             'total_keywords': len(df),
@@ -43,15 +38,10 @@ class OpenAIService:
             'unique_keywords': df['keyword'].nunique()
         }
         
-        # Añadir traffic stats si existe
-        if 'traffic' in df.columns:
-            stats['total_traffic'] = int(df['traffic'].sum())
-            stats['avg_traffic'] = int(df['traffic'].mean())
-        
         # Determinar tipo de análisis
         analysis_instructions = self._get_analysis_instructions(analysis_type)
         
-        # ARREGLO: Construir secciones opcionales ANTES del f-string
+        # Secciones opcionales
         gaps_section = ""
         if include_gaps:
             gaps_section = """,
@@ -77,25 +67,6 @@ class OpenAIService:
         }
     ]"""
         
-        # Instrucciones adicionales
-        extra_instructions = ""
-        if custom_instructions:
-            extra_instructions = f"\n{custom_instructions}\n"
-        
-        if include_semantic:
-            extra_instructions += "\nIMPORTANTE: Realiza análisis semántico profundo para entender la intención real detrás de cada keyword."
-        
-        if include_trends:
-            extra_instructions += "\nIMPORTANTE: Identifica tendencias emergentes y keywords en crecimiento."
-        
-        if include_gaps:
-            extra_instructions += "\nIMPORTANTE: Detecta gaps de contenido - topics con alto volumen pero poca cobertura competitiva."
-        
-        # Formatear stats de traffic si existe
-        traffic_stats = ""
-        if 'total_traffic' in stats:
-            traffic_stats = f"\n- Tráfico total: {stats['total_traffic']:,}"
-        
         system_message = """Eres un experto en SEO y análisis estratégico de keywords. 
 Tu especialidad es identificar patrones, oportunidades y crear estrategias data-driven.
 Siempre respondes con JSON válido y análisis profundos."""
@@ -106,7 +77,7 @@ Siempre respondes con JSON válido y análisis profundos."""
 - Total keywords: {stats['total_keywords']:,}
 - Volumen total: {stats['total_volume']:,}
 - Volumen promedio: {stats['avg_volume']:,}
-- Keywords únicas: {stats['unique_keywords']:,}{traffic_stats}
+- Keywords únicas: {stats['unique_keywords']:,}
 
 # TIPO DE ANÁLISIS
 {analysis_type}
@@ -118,7 +89,11 @@ Crea un análisis con {num_tiers} tiers (niveles) de prioridad:
 - Tier 1: Alto volumen y máxima prioridad estratégica
 - Tier {num_tiers}: Menor volumen pero oportunidades específicas
 
-{extra_instructions}
+{custom_instructions}
+
+{"IMPORTANTE: Realiza análisis semántico profundo para entender la intención real detrás de cada keyword." if include_semantic else ""}
+{"IMPORTANTE: Identifica tendencias emergentes y keywords en crecimiento." if include_trends else ""}
+{"IMPORTANTE: Detecta gaps de contenido - topics con alto volumen pero poca cobertura competitiva." if include_gaps else ""}
 
 # FORMATO DE RESPUESTA (CRÍTICO - RESPONDER SOLO CON JSON)
 Responde ÚNICAMENTE con un JSON válido con esta estructura:
@@ -189,20 +164,53 @@ Asigna tiers considerando el valor estratégico de cada etapa."""
                 response_format={"type": "json_object"}
             )
             
-            # Extraer contenido
+            # VALIDACIÓN: Verificar que la respuesta existe
+            if not response or not response.choices:
+                raise ValueError("OpenAI no devolvió ninguna respuesta. Verifica tu API key y límites de uso.")
+            
+            # VALIDACIÓN: Verificar que hay contenido
             response_text = response.choices[0].message.content
+            
+            if response_text is None or response_text.strip() == "":
+                # Log adicional para debugging
+                finish_reason = response.choices[0].finish_reason if response.choices else "unknown"
+                raise ValueError(
+                    f"OpenAI devolvió una respuesta vacía. "
+                    f"Finish reason: {finish_reason}. "
+                    f"Esto puede deberse a: (1) Filtro de contenido, (2) API key inválida, "
+                    f"(3) Límite de tokens excedido, o (4) Error del modelo."
+                )
             
             # Parsear JSON
             try:
                 result = json.loads(response_text)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as json_error:
                 # Intentar extraer JSON del texto
                 import re
                 json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
                 if json_match:
-                    result = json.loads(json_match.group())
+                    try:
+                        result = json.loads(json_match.group())
+                    except json.JSONDecodeError:
+                        raise ValueError(
+                            f"No se pudo parsear el JSON de OpenAI. "
+                            f"Respuesta recibida (primeros 500 chars): {response_text[:500]}"
+                        ) from json_error
                 else:
-                    raise ValueError("No se pudo extraer JSON válido de la respuesta")
+                    raise ValueError(
+                        f"No se encontró JSON válido en la respuesta de OpenAI. "
+                        f"Respuesta recibida: {response_text[:500]}"
+                    ) from json_error
+            
+            # VALIDACIÓN: Verificar que el resultado tiene la estructura esperada
+            if not isinstance(result, dict):
+                raise ValueError(f"La respuesta de OpenAI no es un diccionario JSON válido: {type(result)}")
+            
+            if 'topics' not in result:
+                raise ValueError(
+                    f"La respuesta de OpenAI no contiene el campo 'topics'. "
+                    f"Campos disponibles: {list(result.keys())}"
+                )
             
             # Enriquecer resultados
             result = self._enrich_results(result, df)
@@ -210,23 +218,28 @@ Asigna tiers considerando el valor estratégico de cada etapa."""
             return result
             
         except Exception as e:
-            raise Exception(f"Error al analizar con OpenAI: {str(e)}")
+            # Proporcionar contexto adicional sobre el error
+            error_message = f"Error al analizar con OpenAI: {str(e)}"
+            
+            # Si es un error de la API de OpenAI, dar más detalles
+            if "API" in str(e) or "authentication" in str(e).lower():
+                error_message += "\n\n💡 Sugerencia: Verifica que tu API key de OpenAI sea válida y tenga créditos disponibles."
+            elif "rate" in str(e).lower() or "limit" in str(e).lower():
+                error_message += "\n\n💡 Sugerencia: Has excedido el límite de solicitudes. Espera unos minutos e intenta de nuevo."
+            elif "timeout" in str(e).lower():
+                error_message += "\n\n💡 Sugerencia: La solicitud tardó demasiado. Intenta con menos keywords o vuelve a intentar."
+            
+            raise Exception(error_message)
     
     def _enrich_results(self, result: Dict, df: pd.DataFrame) -> Dict:
         """Enriquece los resultados con datos adicionales"""
         
         if 'topics' in result:
             for topic in result['topics']:
-                # Asegurar tipos correctos
+                # Asegurar que todos los campos numéricos sean int/float
                 topic['keyword_count'] = int(topic.get('keyword_count', 0))
                 topic['volume'] = int(topic.get('volume', 0))
-                
-                # Traffic puede no existir en el resultado de la IA
-                if 'traffic' not in topic and 'traffic' in df.columns:
-                    # Estimar basado en volumen
-                    topic['traffic'] = int(topic['volume'] * 0.3)
-                else:
-                    topic['traffic'] = int(topic.get('traffic', topic['volume'] * 0.3))
+                topic['traffic'] = int(topic.get('traffic', 0))
                 
                 # Calcular métricas adicionales
                 if topic['keyword_count'] > 0:
@@ -246,21 +259,7 @@ Asigna tiers considerando el valor estratégico de cada etapa."""
     ) -> Dict[str, Any]:
         """
         Compara y valida resultados de Claude con análisis de OpenAI
-        
-        Args:
-            claude_result: Resultado del análisis de Claude
-            df: DataFrame con las keywords
-        
-        Returns:
-            Análisis comparativo y recomendaciones
         """
-        
-        # Preparar datos de forma segura
-        columns_to_use = ['keyword', 'volume']
-        if 'traffic' in df.columns:
-            columns_to_use.append('traffic')
-        
-        sample_data = df.nlargest(200, 'volume')[columns_to_use].to_dict('records')
         
         messages = [
             {
@@ -280,7 +279,7 @@ ANÁLISIS A REVISAR:
 {json.dumps(claude_result.get('topics', [])[:20], indent=2)}
 
 KEYWORDS DISPONIBLES (muestra):
-{json.dumps(sample_data, indent=2)}
+{json.dumps(df.nlargest(200, 'volume')[['keyword', 'volume']].to_dict('records'), indent=2)}
 
 Responde en JSON:
 {{
@@ -302,6 +301,15 @@ Responde en JSON:
                 response_format={"type": "json_object"}
             )
             
+            # Validar respuesta
+            if not response or not response.choices or not response.choices[0].message.content:
+                return {
+                    "validation": "No se pudo completar la validación cruzada: respuesta vacía",
+                    "missing_topics": [],
+                    "improvements": [],
+                    "error": "Empty response from OpenAI"
+                }
+            
             return json.loads(response.choices[0].message.content)
             
         except Exception as e:
@@ -316,12 +324,7 @@ Responde en JSON:
     def get_topic_details(self, topic_name: str, df: pd.DataFrame) -> pd.DataFrame:
         """Identifica keywords específicas que pertenecen a un topic"""
         
-        # Preparar datos de forma segura
-        columns_to_use = ['keyword', 'volume']
-        if 'traffic' in df.columns:
-            columns_to_use.append('traffic')
-        
-        sample_keywords = df.nlargest(500, 'volume')[columns_to_use].to_dict('records')
+        sample_keywords = df.nlargest(500, 'volume')[['keyword', 'volume']].to_dict('records')
         
         messages = [
             {
@@ -350,6 +353,10 @@ Dataset:
                 max_tokens=2000,
                 response_format={"type": "json_object"}
             )
+            
+            if not response or not response.choices or not response.choices[0].message.content:
+                print("OpenAI devolvió respuesta vacía para topic details")
+                return pd.DataFrame()
             
             result = json.loads(response.choices[0].message.content)
             matching_keywords = result.get('keywords', [])
