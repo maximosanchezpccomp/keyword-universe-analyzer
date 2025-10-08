@@ -1,7 +1,10 @@
 """
 Generador de informes PDF completos con múltiples análisis de keywords
 
-Instalar dependencia:
+Este módulo crea informes profesionales en PDF con branding PC Componentes,
+incluyendo análisis temático, de intención y de funnel.
+
+Instalación requerida:
     pip install reportlab
 """
 
@@ -38,7 +41,7 @@ class PDFReportGenerator:
         self._setup_custom_styles()
     
     def _setup_custom_styles(self):
-        """Configura estilos personalizados"""
+        """Configura estilos personalizados para el PDF"""
         
         # Título principal
         self.styles.add(ParagraphStyle(
@@ -665,3 +668,62 @@ def generate_comprehensive_pdf(
     """
     generator = PDFReportGenerator()
     return generator.generate_report(analyses, total_keywords, total_volume)
+
+
+# ============================================
+# EJEMPLO DE USO
+# ============================================
+
+def example_usage():
+    """Ejemplo de cómo generar un PDF"""
+    
+    # Datos de ejemplo
+    analyses = {
+        'thematic': {
+            'summary': 'Resumen del análisis temático...',
+            'topics': [
+                {
+                    'topic': 'SEO Tools',
+                    'tier': 1,
+                    'keyword_count': 150,
+                    'volume': 500000,
+                    'traffic': 150000,
+                    'priority': 'high'
+                },
+                {
+                    'topic': 'Keyword Research',
+                    'tier': 1,
+                    'keyword_count': 120,
+                    'volume': 350000,
+                    'traffic': 105000,
+                    'priority': 'high'
+                }
+            ],
+            'gaps': [
+                {
+                    'topic': 'API Integration',
+                    'volume': 50000,
+                    'description': 'Oportunidad de contenido técnico',
+                    'difficulty': 'medium',
+                    'keyword_count': 25
+                }
+            ]
+        }
+    }
+    
+    # Generar PDF
+    pdf_bytes = generate_comprehensive_pdf(
+        analyses=analyses,
+        total_keywords=10000,
+        total_volume=5000000
+    )
+    
+    # Guardar
+    with open('ejemplo_informe.pdf', 'wb') as f:
+        f.write(pdf_bytes)
+    
+    print("✅ PDF generado: ejemplo_informe.pdf")
+
+
+if __name__ == "__main__":
+    example_usage()
