@@ -663,7 +663,7 @@ domain|another-site.com""",
             else:
                 st.warning("⚠️ Ingresa tu API key de Semrush en la barra lateral")
     
-    # TAB 2: Análisis con IA
+# TAB 2: Análisis con IA
     with tab2:
         st.header("Análisis con IA")
         
@@ -732,165 +732,228 @@ domain|another-site.com""",
                 include_trends = st.checkbox("Identificar tendencias emergentes", value=True)
                 include_gaps = st.checkbox("Detectar gaps de contenido", value=True)
             
+            # VERIFICAR CACHÉ ANTES DE ANALIZAR
+            cache_manager = CacheManager()
+            data_hash = cache_manager.get_data_hash(df)
+            cached_analysis_id = cache_manager.find_cached_analysis(data_hash, analysis_type, num_tiers)
+            
+            if cached_analysis_id:
+                st.info(f"💾 Ya existe un análisis de **{analysis_type}** con {num_tiers} tiers para estos datos en caché")
+                
+                col_cache_opt1, col_cache_opt2 = st.columns(2)
+                
+                with col_cache_opt1:
+                    if st.button("📂 Cargar desde Caché (Sin gastar créditos)", type="primary", use_container_width=True):
+                        with st.spinner("Cargando análisis desde caché..."):
+                            loaded = cache_manager.load_analysis(cached_analysis_id)
+                            
+                            if loaded:
+                                st.session_state.keyword_universe = loaded['keyword_universe']
+                                if 'processed_data' in loaded:
+                                    st.session_state.processed_data = pd.DataFrame(loaded['processed_data'])
+                                
+                                st.success("✅ Análisis cargado desde caché")
+                                st.balloons()
+                                st.rerun()
+                
+                with col_cache_opt2:
+                    st.caption("O ejecuta nuevo análisis:")
+                    force_new = st.checkbox("Forzar nuevo análisis", value=False)
+            else:
+                force_new = True  # No hay caché, siempre nuevo
+            
             # Botón de análisis
-            if st.button("🚀 Analizar con IA", type="primary", use_container_width=True):
-                with st.spinner(f"🧠 {ai_provider.split('(')[0].strip()} está analizando tu universo de keywords..."):
-                    try:
-                        if ai_provider == "Claude (Anthropic)":
-                            # Análisis con Claude
-                            anthropic_service = AnthropicService(anthropic_key, model_choice)
+            if force_new or not cached_analysis_id:
+                if st.button("🚀 Analizar con IA", type="primary", use_container_width=True, disabled=(cached_analysis_id and not force_new)):
+                    with st.spinner(f"🧠 {ai_provider.split('(')[0].strip()} está analizando tu universo de keywords..."):
+                        try:
+                            if ai_provider == "Claude (Anthropic)":
+                                # Análisis con Claude
+                                anthropic_service = AnthropicService(anthropic_key, model_choice)
+                                
+                                prompt = anthropic_service.create_universe_prompt(
+                                    df,
+                                    analysis_type=analysis_type,
+                                    num_tiers=num_tiers,
+                                    custom_instructions=custom_instructions,
+                                    include_semantic=include_semantic,
+                                    include_trends=include_trends,
+                                    include_gaps=include_gaps
+                                )
+                                
+                                result = anthropic_service.analyze_keywords(prompt, df)
+                                result['provider'] = 'Claude'
+                                result['model'] = model_choice
+                                
+                            elif ai_provider == "OpenAI":
+                                # Análisis con OpenAI
+                                from app.services.openai_service import OpenAIService
+                                
+                                openai_service = OpenAIService(openai_key, model_choice)
+                                
+                                messages = openai_service.create_universe_prompt(
+                                    df,
+                                    analysis_type=analysis_type,
+                                    num_tiers=num_tiers,
+                                    custom_instructions=custom_instructions,
+                                    include_semantic=include_semantic,
+                                    include_trends=include_trends,
+                                    include_gaps=include_gaps
+                                )
+                                
+                                result = openai_service.analyze_keywords(messages, df)
+                                result['provider'] = 'OpenAI'
+                                result['model'] = model_choice
+                                
+                            else:  # Ambos (Validación Cruzada)
+                                from app.services.openai_service import OpenAIService
+                                
+                                # Análisis con Claude
+                                st.info("1️⃣ Analizando con Claude...")
+                                anthropic_service = AnthropicService(anthropic_key, claude_model)
+                                
+                                prompt_claude = anthropic_service.create_universe_prompt(
+                                    df,
+                                    analysis_type=analysis_type,
+                                    num_tiers=num_tiers,
+                                    custom_instructions=custom_instructions,
+                                    include_semantic=include_semantic,
+                                    include_trends=include_trends,
+                                    include_gaps=include_gaps
+                                )
+                                
+                                result_claude = anthropic_service.analyze_keywords(prompt_claude, df)
+                                
+                                # Análisis con OpenAI
+                                st.info("2️⃣ Analizando con OpenAI...")
+                                openai_service = OpenAIService(openai_key, openai_model)
+                                
+                                messages_openai = openai_service.create_universe_prompt(
+                                    df,
+                                    analysis_type=analysis_type,
+                                    num_tiers=num_tiers,
+                                    custom_instructions=custom_instructions,
+                                    include_semantic=include_semantic,
+                                    include_trends=include_trends,
+                                    include_gaps=include_gaps
+                                )
+                                
+                                result_openai = openai_service.analyze_keywords(messages_openai, df)
+                                
+                                # Validación cruzada
+                                st.info("3️⃣ Comparando resultados...")
+                                comparison = openai_service.compare_with_claude(result_claude, df)
+                                
+                                # Combinar resultados
+                                result = {
+                                    'summary': f"**Análisis de Claude:**\n{result_claude.get('summary', '')}\n\n**Análisis de OpenAI:**\n{result_openai.get('summary', '')}",
+                                    'topics': result_claude.get('topics', []),
+                                    'topics_openai': result_openai.get('topics', []),
+                                    'comparison': comparison,
+                                    'provider': 'Ambos',
+                                    'models': f"Claude: {claude_model} | OpenAI: {openai_model}"
+                                }
+                                
+                                if 'gaps' in result_claude:
+                                    result['gaps'] = result_claude['gaps']
+                                if 'trends' in result_claude:
+                                    result['trends'] = result_claude['trends']
                             
-                            prompt = anthropic_service.create_universe_prompt(
-                                df,
-                                analysis_type=analysis_type,
-                                num_tiers=num_tiers,
-                                custom_instructions=custom_instructions,
-                                include_semantic=include_semantic,
-                                include_trends=include_trends,
-                                include_gaps=include_gaps
-                            )
+                            st.session_state.keyword_universe = result
                             
-                            result = anthropic_service.analyze_keywords(prompt, df)
-                            result['provider'] = 'Claude'
-                            result['model'] = model_choice
+                            st.success("✅ ¡Análisis completado!")
+                            st.balloons()
                             
-                        elif ai_provider == "OpenAI":
-                            # Análisis con OpenAI
-                            from app.services.openai_service import OpenAIService
+                            # AUTO-GUARDAR EN BACKGROUND
+                            try:
+                                auto_name = f"{analysis_type} - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                                
+                                metadata = {
+                                    'name': auto_name,
+                                    'description': f"Auto-guardado: {analysis_type} con {num_tiers} tiers",
+                                    'analysis_type': analysis_type,
+                                    'num_tiers': num_tiers,
+                                    'total_keywords': len(df),
+                                    'total_volume': int(df['volume'].sum()),
+                                    'custom_instructions': custom_instructions,
+                                    'data_hash': data_hash,
+                                    'cache_key': cache_manager._generate_cache_key(data_hash, analysis_type, num_tiers)
+                                }
+                                
+                                analysis_id = cache_manager.save_analysis(
+                                    keyword_universe=result,
+                                    processed_data=df,
+                                    metadata=metadata,
+                                    auto_save=True
+                                )
+                                
+                                st.success(f"💾 Análisis guardado automáticamente (ID: {analysis_id[:12]}...)")
+                                
+                            except Exception as e:
+                                st.warning(f"⚠️ No se pudo auto-guardar: {str(e)}")
                             
-                            openai_service = OpenAIService(openai_key, model_choice)
+                            # OPCIÓN DE GUARDADO MANUAL CON NOMBRE PERSONALIZADO
+                            st.divider()
+                            st.subheader("💾 Guardar con Nombre Personalizado")
                             
-                            messages = openai_service.create_universe_prompt(
-                                df,
-                                analysis_type=analysis_type,
-                                num_tiers=num_tiers,
-                                custom_instructions=custom_instructions,
-                                include_semantic=include_semantic,
-                                include_trends=include_trends,
-                                include_gaps=include_gaps
-                            )
-                            
-                            result = openai_service.analyze_keywords(messages, df)
-                            result['provider'] = 'OpenAI'
-                            result['model'] = model_choice
-                            
-                        else:  # Ambos (Validación Cruzada)
-                            from app.services.openai_service import OpenAIService
-                            
-                            # Análisis con Claude
-                            st.info("1️⃣ Analizando con Claude...")
-                            anthropic_service = AnthropicService(anthropic_key, claude_model)
-                            
-                            prompt_claude = anthropic_service.create_universe_prompt(
-                                df,
-                                analysis_type=analysis_type,
-                                num_tiers=num_tiers,
-                                custom_instructions=custom_instructions,
-                                include_semantic=include_semantic,
-                                include_trends=include_trends,
-                                include_gaps=include_gaps
-                            )
-                            
-                            result_claude = anthropic_service.analyze_keywords(prompt_claude, df)
-                            
-                            # Análisis con OpenAI
-                            st.info("2️⃣ Analizando con OpenAI...")
-                            openai_service = OpenAIService(openai_key, openai_model)
-                            
-                            messages_openai = openai_service.create_universe_prompt(
-                                df,
-                                analysis_type=analysis_type,
-                                num_tiers=num_tiers,
-                                custom_instructions=custom_instructions,
-                                include_semantic=include_semantic,
-                                include_trends=include_trends,
-                                include_gaps=include_gaps
-                            )
-                            
-                            result_openai = openai_service.analyze_keywords(messages_openai, df)
-                            
-                            # Validación cruzada
-                            st.info("3️⃣ Comparando resultados...")
-                            comparison = openai_service.compare_with_claude(result_claude, df)
-                            
-                            # Combinar resultados
-                            result = {
-                                'summary': f"**Análisis de Claude:**\n{result_claude.get('summary', '')}\n\n**Análisis de OpenAI:**\n{result_openai.get('summary', '')}",
-                                'topics': result_claude.get('topics', []),
-                                'topics_openai': result_openai.get('topics', []),
-                                'comparison': comparison,
-                                'provider': 'Ambos',
-                                'models': f"Claude: {claude_model} | OpenAI: {openai_model}"
-                            }
-                            
-                            if 'gaps' in result_claude:
-                                result['gaps'] = result_claude['gaps']
-                            if 'trends' in result_claude:
-                                result['trends'] = result_claude['trends']
-                        
-                        st.session_state.keyword_universe = result
-                        
-                        st.success("✅ ¡Análisis completado!")
-                        st.balloons()
-                        
-                        # Auto-guardar en caché
-                        st.divider()
-                        st.subheader("💾 Guardar Análisis")
-                        
-                        col_save_form1, col_save_form2 = st.columns([2, 1])
-                        
-                        with col_save_form1:
-                            analysis_name = st.text_input(
-                                "Nombre del análisis",
-                                value=f"Análisis {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-                                key="analysis_name",
-                                help="Nombre para identificar este análisis después"
-                            )
-                            
-                            analysis_description = st.text_area(
-                                "Descripción (opcional)",
-                                placeholder="Ej: Análisis de placas base para AMD, mercado ES",
-                                key="analysis_description",
-                                height=80
-                            )
-                        
-                        with col_save_form2:
-                            st.markdown("&nbsp;")
-                            st.markdown("&nbsp;")
-                            
-                            if st.button("💾 Guardar en Caché", type="primary", use_container_width=True, key="save_to_cache"):
-                                try:
-                                    cache_manager = CacheManager()
-                                    
-                                    metadata = {
-                                        'name': analysis_name,
-                                        'description': analysis_description,
-                                        'analysis_type': analysis_type,
-                                        'num_tiers': num_tiers,
-                                        'total_keywords': len(df),
-                                        'total_volume': int(df['volume'].sum()),
-                                        'custom_instructions': custom_instructions
-                                    }
-                                    
-                                    analysis_id = cache_manager.save_analysis(
-                                        keyword_universe=result,
-                                        processed_data=df,
-                                        metadata=metadata
+                            with st.form("save_analysis_form", clear_on_submit=False):
+                                st.markdown("Opcionalmente, guarda este análisis con un nombre más descriptivo:")
+                                
+                                col_form1, col_form2 = st.columns([3, 1])
+                                
+                                with col_form1:
+                                    custom_name = st.text_input(
+                                        "Nombre personalizado",
+                                        value="",
+                                        placeholder="Ej: Placas base AMD 2024",
+                                        help="Deja vacío para usar el nombre automático"
                                     )
                                     
-                                    st.success(f"✅ Análisis guardado con ID: {analysis_id[:16]}...")
-                                    st.info("💡 Puedes cargarlo después desde la barra lateral → 💾 Análisis Guardados")
-                                    
-                                except Exception as e:
-                                    st.error(f"❌ Error al guardar: {str(e)}")
-                        
-                        st.caption("💡 Guarda este análisis para no gastar créditos al revisarlo después")
-                        
-                    except Exception as e:
-                        st.error(f"❌ Error en el análisis: {str(e)}")
-                        import traceback
-                        with st.expander("Ver detalles del error"):
-                            st.code(traceback.format_exc())
+                                    custom_description = st.text_area(
+                                        "Descripción detallada",
+                                        value="",
+                                        placeholder="Ej: Análisis temático de placas base AMD para mercado español, enfoque en gaming",
+                                        height=80
+                                    )
+                                
+                                with col_form2:
+                                    st.markdown("&nbsp;")
+                                    st.markdown("&nbsp;")
+                                    submitted = st.form_submit_button(
+                                        "💾 Guardar Personalizado",
+                                        type="secondary",
+                                        use_container_width=True
+                                    )
+                                
+                                if submitted and (custom_name or custom_description):
+                                    try:
+                                        final_name = custom_name if custom_name else auto_name
+                                        final_description = custom_description if custom_description else metadata['description']
+                                        
+                                        custom_metadata = metadata.copy()
+                                        custom_metadata['name'] = final_name
+                                        custom_metadata['description'] = final_description
+                                        
+                                        custom_id = cache_manager.save_analysis(
+                                            keyword_universe=result,
+                                            processed_data=df,
+                                            metadata=custom_metadata,
+                                            auto_save=False
+                                        )
+                                        
+                                        st.success(f"✅ Guardado personalizado: {final_name}")
+                                        st.info("💡 Puedes encontrarlo en la barra lateral → 💾 Análisis Guardados")
+                                        
+                                    except Exception as e:
+                                        st.error(f"❌ Error al guardar: {str(e)}")
+                            
+                            st.caption("💡 **Nota:** Ya se guardó automáticamente. El guardado personalizado crea una copia adicional con tu nombre.")
+                            
+                        except Exception as e:
+                            st.error(f"❌ Error en el análisis: {str(e)}")
+                            import traceback
+                            with st.expander("Ver detalles del error"):
+                                st.code(traceback.format_exc())
             
             # Mostrar resultados si existen
             if st.session_state.keyword_universe:
