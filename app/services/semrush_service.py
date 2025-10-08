@@ -231,6 +231,17 @@ class SemrushService:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
+        # Asegurar columnas básicas existen
+        if 'traffic' not in df.columns:
+            # Estimar traffic como 30% del volumen si no existe
+            df['traffic'] = (df['volume'] * 0.3).astype(int) if 'volume' in df.columns else 0
+        
+        if 'cpc' not in df.columns:
+            df['cpc'] = 0
+        
+        if 'difficulty' not in df.columns:
+            df['difficulty'] = 50
+        
         return df
     
     def batch_get_keywords(
