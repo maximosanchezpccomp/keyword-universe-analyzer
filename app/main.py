@@ -16,7 +16,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from app.services.anthropic_service import AnthropicService
 from app.services.semrush_service import SemrushService
-from app.services.architecture_service import WebArchitectureService  # NUEVO
+from app.services.architecture_service import ArchitectureService 
 from app.components.data_processor import DataProcessor
 from app.components.visualizer import KeywordVisualizer
 from app.utils.helpers import export_to_excel, calculate_metrics, format_number
@@ -1296,7 +1296,7 @@ domain|another-site.com""",
                         openai_service = OpenAIService(openai_key, model_choice if arch_provider == "OpenAI" else openai_model)
                     
                     # Crear servicio de arquitectura
-                    arch_service = WebArchitectureService(claude_service, openai_service)
+                    arch_service = ArchitectureService(claude_service, openai_service)
                     
                     # Extraer todos los análisis
                     all_analyses = [a['result'] for a in st.session_state.analyses_history]
@@ -1935,7 +1935,7 @@ domain|another-site.com""",
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                         )
                     else:  # Mapa del Sitio
-                        arch_service = WebArchitectureService()
+                        arch_service = ArchitectureService()
                         sitemap = arch_service.export_architecture_to_sitemap(
                             st.session_state.architecture
                         )
