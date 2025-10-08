@@ -7,6 +7,8 @@ from typing import Dict, List, Any
 import sys
 import os
 from pathlib import Path
+from io import BytesIO
+import openpyxl
 
 
 # Añadir el directorio raíz al path
@@ -14,7 +16,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from app.services.anthropic_service import AnthropicService
 from app.services.semrush_service import SemrushService
-from app.services.architecture_service import WebArchitectureService
+from app.services.architecture_service import WebArchitectureService  # NUEVO
 from app.components.data_processor import DataProcessor
 from app.components.visualizer import KeywordVisualizer
 from app.utils.helpers import export_to_excel, calculate_metrics, format_number
@@ -232,6 +234,12 @@ if 'uploaded_files' not in st.session_state:
     st.session_state.uploaded_files = []
 if 'processed_data' not in st.session_state:
     st.session_state.processed_data = None
+
+# NUEVO: Session state para arquitectura web
+if 'architecture' not in st.session_state:
+    st.session_state.architecture = None
+if 'analyses_history' not in st.session_state:
+    st.session_state.analyses_history = []
 
 # Inicializar session state para multi-análisis
 if 'multi_analyses' not in st.session_state:
@@ -545,14 +553,16 @@ def main():
         # Info
         st.info("💡 **Tip:** Sube archivos CSV o Excel de Ahrefs, Semrush o similar con columnas: keyword, volume, traffic")
     
-    # Tabs principales
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    # Tabs principales - ACTUALIZADO: 6 tabs ahora
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "📁 Carga de Datos", 
         "🧠 Análisis con IA", 
         "📊 Visualización",
-        "🎯 Oportunidades",  # NUEVA TAB
+        "🏗️ Arquitectura Web",  # NUEVA TAB
+        "🎯 Oportunidades",
         "📥 Exportar"
     ])
+    
     # TAB 1: Carga de datos
     with tab1:
         st.header("Carga tus archivos de keywords")
@@ -764,7 +774,7 @@ domain|another-site.com""",
             else:
                 st.warning("⚠️ Ingresa tu API key de Semrush en la barra lateral")
     
-# TAB 2: Análisis con IA
+    # TAB 2: Análisis con IA
     with tab2:
         st.header("Análisis con IA")
         
@@ -961,6 +971,15 @@ domain|another-site.com""",
                                     result['trends'] = result_claude['trends']
                             
                             st.session_state.keyword_universe = result
+                            
+                            # GUARDAR EN HISTORIAL DE ANÁLISIS (NUEVO)
+                            if result not in st.session_state.analyses_history:
+                                st.session_state.analyses_history.append({
+                                    'timestamp': datetime.now(),
+                                    'analysis_type': analysis_type,
+                                    'provider': result.get('provider', 'N/A'),
+                                    'result': result
+                                })
                             
                             st.success("✅ ¡Análisis completado!")
                             st.balloons()
@@ -1168,284 +1187,622 @@ domain|another-site.com""",
                         st.markdown(gap.get('description', 'N/A'))
                         st.metric("Volumen potencial", f"{gap.get('volume', 0):,.0f}")
 
-    # TAB 4: OPORTUNIDADES
-        with tab4:
-            st.header("🎯 Oportunidades Identificadas")
+    # TAB 4: ARQUITECTURA WEB (NUEVO)
+    with tab4:
+        st.header("🏗️ Propuesta de Arquitectura Web")
+        
+        # Verificar que hay análisis previos
+        if not st.session_state.analyses_history:
+            st.info("🧠 Primero realiza al menos un análisis en la pestaña 'Análisis con IA'")
+            st.markdown("""
+            ### ¿Qué es la Arquitectura Web?
             
-            if st.session_state.keyword_universe is None:
-                st.info("🧠 Primero realiza el análisis con IA en la pestaña 'Análisis con IA'")
-            else:
-                result = st.session_state.keyword_universe
-                
-                # Resumen ejecutivo de oportunidades
-                st.subheader("📊 Resumen de Oportunidades")
-                
-                # Calcular totales
-                total_opportunities = 0
-                gaps_count = len(result.get('gaps', []))
-                trends_count = len(result.get('trends', []))
-                tier1_count = len([t for t in result.get('topics', []) if t.get('tier') == 1])
-                
-                if 'topics_openai' in result:
-                    tier1_openai = len([t for t in result.get('topics_openai', []) if t.get('tier') == 1])
-                    tier1_count = max(tier1_count, tier1_openai)
-                
-                total_opportunities = gaps_count + trends_count + tier1_count
-                
-                # Métricas principales
-                col1, col2, col3, col4 = st.columns(4)
-                
-                with col1:
-                    st.metric(
-                        "Total Oportunidades",
-                        total_opportunities,
-                        help="Suma de gaps, tendencias y topics Tier 1"
-                    )
-                
-                with col2:
-                    st.metric(
-                        "Gaps de Contenido",
-                        gaps_count,
-                        help="Topics con alto volumen pero poca cobertura"
-                    )
-                
-                with col3:
-                    st.metric(
-                        "Tendencias Emergentes",
-                        trends_count,
-                        help="Keywords en crecimiento"
-                    )
-                
-                with col4:
-                    st.metric(
-                        "Topics Prioritarios",
-                        tier1_count,
-                        help="Topics Tier 1 - máxima prioridad"
-                    )
-                
-                st.divider()
-                
-                # Filtros y ordenación
-                col1, col2 = st.columns([3, 1])
-                
-                with col1:
-                    opportunity_filter = st.multiselect(
-                        "Filtrar por tipo de oportunidad",
-                        ["Gaps de Contenido", "Tendencias", "Topics Tier 1"],
-                        default=["Gaps de Contenido", "Tendencias", "Topics Tier 1"]
-                    )
-                
-                with col2:
-                    sort_by = st.selectbox(
-                        "Ordenar por",
-                        ["Volumen (mayor)", "Volumen (menor)", "Nombre"]
-                    )
-                
-                # Preparar todas las oportunidades
-                all_opportunities = []
-                
-                # 1. Gaps de contenido
-                if "Gaps de Contenido" in opportunity_filter and gaps_count > 0:
-                    for gap in result['gaps']:
-                        all_opportunities.append({
-                            'tipo': 'Gap de Contenido',
-                            'nombre': gap.get('topic', 'N/A'),
-                            'volumen': gap.get('volume', 0),
-                            'keywords': gap.get('keyword_count', 0),
-                            'prioridad': 'Alta',
-                            'dificultad': gap.get('difficulty', 'medium'),
-                            'descripcion': gap.get('description', ''),
-                            'tier_badge': 'badge-tier-1',
-                            'icon': '🎯'
-                        })
-                
-                # 2. Tendencias emergentes
-                if "Tendencias" in opportunity_filter and trends_count > 0:
-                    for trend in result['trends']:
-                        all_opportunities.append({
-                            'tipo': 'Tendencia Emergente',
-                            'nombre': trend.get('trend', 'N/A'),
-                            'volumen': trend.get('total_volume', 0),
-                            'keywords': len(trend.get('keywords', [])),
-                            'prioridad': 'Media',
-                            'dificultad': 'variable',
-                            'descripcion': trend.get('insight', ''),
-                            'tier_badge': 'badge-tier-2',
-                            'icon': '📈'
-                        })
-                
-                # 3. Topics Tier 1
-                if "Topics Tier 1" in opportunity_filter and tier1_count > 0:
-                    tier1_topics = [t for t in result.get('topics', []) if t.get('tier') == 1]
+            Esta funcionalidad genera una propuesta completa de estructura para tu sitio web basada en:
+            - Todos los análisis de keywords realizados
+            - Patrones de búsqueda identificados
+            - Intención del usuario
+            - Volumen y prioridad estratégica
+            
+            La arquitectura se organiza en:
+            - **Familias**: Categorías principales (nivel 1)
+            - **Subfamilias**: Subcategorías (nivel 2)
+            - **Marcas**: Agrupaciones por fabricante/marca
+            - **Casos de uso**: Agrupaciones por aplicación específica
+            """)
+            return
+        
+        # Mostrar resumen de análisis disponibles
+        st.subheader("📊 Análisis Disponibles")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric("Análisis Realizados", len(st.session_state.analyses_history))
+        with col2:
+            total_topics = sum([len(a['result'].get('topics', [])) for a in st.session_state.analyses_history])
+            st.metric("Topics Identificados", total_topics)
+        with col3:
+            if st.session_state.processed_data is not None:
+                st.metric("Keywords Totales", f"{len(st.session_state.processed_data):,}")
+        
+        # Mostrar lista de análisis
+        with st.expander("👁️ Ver análisis realizados", expanded=False):
+            for i, analysis in enumerate(st.session_state.analyses_history, 1):
+                st.markdown(f"""
+                **Análisis {i}** ({analysis['analysis_type']})
+                - Proveedor: {analysis['provider']}
+                - Fecha: {analysis['timestamp'].strftime('%Y-%m-%d %H:%M')}
+                - Topics: {len(analysis['result'].get('topics', []))}
+                """)
+        
+        st.divider()
+        
+        # Configuración de la arquitectura
+        st.subheader("⚙️ Configuración")
+        
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            arch_provider = st.radio(
+                "Proveedor de IA para arquitectura",
+                ["Claude (Anthropic)", "OpenAI", "Ambos (Validación Cruzada)"],
+                horizontal=True,
+                help="Claude es más estratégico. OpenAI es más rápido. Ambos te da dos perspectivas."
+            )
+            
+            custom_arch_instructions = st.text_area(
+                "Instrucciones adicionales (opcional)",
+                placeholder="Ej: Enfócate en categorías de producto, prioriza marcas premium, estructura para e-commerce, etc.",
+                height=100
+            )
+        
+        with col2:
+            st.markdown("### 💡 Tips")
+            st.info("""
+            **Recomendaciones:**
+            - Usa todos tus análisis
+            - Claude es mejor para estrategia
+            - OpenAI es más rápido
+            - Validación Cruzada da máxima confianza
+            """)
+        
+        # Botón para generar arquitectura
+        if st.button("🏗️ Generar Arquitectura Web", type="primary", use_container_width=True):
+            
+            # Validar API keys según proveedor
+            provider_map = {
+                "Claude (Anthropic)": ("claude", anthropic_key, "Anthropic"),
+                "OpenAI": ("openai", openai_key, "OpenAI"),
+                "Ambos (Validación Cruzada)": ("both", anthropic_key and openai_key, "ambas")
+            }
+            
+            provider_key, api_key_check, provider_name = provider_map[arch_provider]
+            
+            if not api_key_check:
+                st.error(f"⚠️ Necesitas la API key de {provider_name}")
+                return
+            
+            with st.spinner(f"🏗️ Generando arquitectura web con {arch_provider}..."):
+                try:
+                    # Preparar servicios
+                    claude_service = None
+                    openai_service = None
                     
-                    for topic in tier1_topics:
-                        all_opportunities.append({
-                            'tipo': 'Topic Prioritario',
-                            'nombre': topic.get('topic', 'N/A'),
-                            'volumen': topic.get('volume', 0),
-                            'keywords': topic.get('keyword_count', 0),
-                            'prioridad': topic.get('priority', 'high'),
-                            'dificultad': 'variable',
-                            'descripcion': topic.get('description', ''),
-                            'tier_badge': 'badge-tier-1',
-                            'icon': '⭐'
-                        })
-                
-                # Ordenar según filtro
-                if sort_by == "Volumen (mayor)":
-                    all_opportunities.sort(key=lambda x: x['volumen'], reverse=True)
-                elif sort_by == "Volumen (menor)":
-                    all_opportunities.sort(key=lambda x: x['volumen'])
-                else:  # Nombre
-                    all_opportunities.sort(key=lambda x: x['nombre'])
-                
-                # Mostrar oportunidades
-                if not all_opportunities:
-                    st.warning("No hay oportunidades que coincidan con los filtros seleccionados")
+                    if provider_key in ["claude", "both"] and anthropic_key:
+                        claude_service = AnthropicService(anthropic_key, model_choice if arch_provider == "Claude (Anthropic)" else claude_model)
+                    
+                    if provider_key in ["openai", "both"] and openai_key:
+                        from app.services.openai_service import OpenAIService
+                        openai_service = OpenAIService(openai_key, model_choice if arch_provider == "OpenAI" else openai_model)
+                    
+                    # Crear servicio de arquitectura
+                    arch_service = WebArchitectureService(claude_service, openai_service)
+                    
+                    # Extraer todos los análisis
+                    all_analyses = [a['result'] for a in st.session_state.analyses_history]
+                    
+                    # Generar arquitectura
+                    architecture = arch_service.generate_architecture(
+                        analysis_results=all_analyses,
+                        df=st.session_state.processed_data,
+                        provider=provider_key,
+                        custom_instructions=custom_arch_instructions
+                    )
+                    
+                    # Guardar en session state
+                    st.session_state.architecture = architecture
+                    
+                    st.success("✅ ¡Arquitectura generada exitosamente!")
+                    st.balloons()
+                    
+                except Exception as e:
+                    st.error(f"❌ Error generando arquitectura: {str(e)}")
+                    import traceback
+                    with st.expander("Ver detalles del error"):
+                        st.code(traceback.format_exc())
+        
+        # Mostrar resultados si existen
+        if st.session_state.architecture:
+            st.divider()
+            st.subheader("📋 Arquitectura Propuesta")
+            
+            arch = st.session_state.architecture
+            
+            # Info del proveedor
+            provider_col1, provider_col2 = st.columns(2)
+            with provider_col1:
+                st.metric("Proveedor", arch.get('provider', 'N/A'))
+            with provider_col2:
+                if arch.get('provider') == 'Ambos':
+                    st.metric("Modelos", arch.get('models', 'N/A'))
                 else:
-                    st.subheader(f"📋 {len(all_opportunities)} Oportunidades Encontradas")
+                    st.metric("Modelo", arch.get('model', 'N/A'))
+            
+            # Resumen ejecutivo
+            with st.expander("📊 Resumen Ejecutivo", expanded=True):
+                st.markdown(arch.get('summary', 'No disponible'))
+            
+            # Si es validación cruzada, mostrar comparación
+            if arch.get('provider') == 'Ambos' and 'comparison' in arch:
+                with st.expander("🔄 Comparación de Propuestas", expanded=False):
+                    comp = arch['comparison']
+                    st.markdown("**Análisis Comparativo:**")
+                    st.info(comp.get('comparison', 'N/A'))
                     
-                    # Mostrar en cards expandibles
-                    for i, opp in enumerate(all_opportunities):
-                        with st.expander(
-                            f"{opp['icon']} {opp['nombre']} - {format_number(opp['volumen'])} búsquedas/mes",
-                            expanded=(i < 5)  # Primeras 5 expandidas
-                        ):
-                            # Header con badges
-                            col1, col2, col3 = st.columns([2, 1, 1])
-                            
-                            with col1:
-                                st.markdown(f"**Tipo:** {opp['tipo']}")
-                            
-                            with col2:
-                                st.markdown(
-                                    f"<span class='{opp['tier_badge']}'>{opp['prioridad'].upper()}</span>",
-                                    unsafe_allow_html=True
-                                )
-                            
-                            with col3:
-                                st.markdown(f"**Dificultad:** {opp['dificultad'].title()}")
-                            
-                            st.divider()
-                            
-                            # Métricas
-                            col1, col2 = st.columns(2)
-                            
-                            with col1:
-                                st.metric("Volumen Total", f"{opp['volumen']:,}")
-                            
-                            with col2:
-                                st.metric("Keywords Relacionadas", opp['keywords'])
-                            
-                            # Descripción
-                            st.markdown("**Descripción:**")
-                            st.write(opp['descripcion'])
-                            
-                            # Acciones recomendadas
-                            st.markdown("**Acción Recomendada:**")
-                            if opp['tipo'] == 'Gap de Contenido':
-                                st.info("💡 Crear contenido completo que cubra este tema. Poca competencia actual.")
-                            elif opp['tipo'] == 'Tendencia Emergente':
-                                st.info("💡 Actuar rápido para posicionarse antes que la competencia.")
-                            else:  # Topic Prioritario
-                                st.info("💡 Priorizar en la estrategia de contenido. Alto ROI potencial.")
+                    if 'common_families' in comp:
+                        st.markdown("**Familias Comunes:**")
+                        for family in comp['common_families']:
+                            st.markdown(f"- {family}")
+                    
+                    st.markdown("**Recomendación:**")
+                    st.success(comp.get('recommendation', 'N/A'))
+            
+            # Familias principales
+            st.subheader("📁 Familias de Contenido")
+            
+            families = arch.get('families', [])
+            
+            if families:
+                # Selector de familia
+                selected_family_idx = st.selectbox(
+                    "Selecciona una familia para ver detalles",
+                    range(len(families)),
+                    format_func=lambda x: f"{families[x]['name']} (Vol: {families[x].get('total_volume', 0):,})"
+                )
                 
-                # Sección de priorización
-                if all_opportunities:
-                    st.divider()
-                    st.subheader("📊 Matriz de Priorización")
+                family = families[selected_family_idx]
+                
+                # Detalles de la familia seleccionada
+                st.markdown(f"## 🏷️ {family['name']}")
+                
+                # Métricas
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Prioridad", family.get('priority', 'N/A').upper())
+                with col2:
+                    st.metric("Keywords", f"{family.get('keyword_count', 0):,}")
+                with col3:
+                    st.metric("Volumen Total", f"{family.get('total_volume', 0):,}")
+                with col4:
+                    st.metric("Tier", family.get('tier', 'N/A'))
+                
+                # Descripción
+                st.markdown("**Descripción:**")
+                st.info(family.get('description', 'No disponible'))
+                
+                # Estrategia de contenido
+                if 'content_strategy' in family:
+                    st.markdown("**Estrategia de Contenido:**")
+                    st.markdown(family['content_strategy'])
+                
+                # Keywords de ejemplo
+                if 'keywords' in family and family['keywords']:
+                    with st.expander("🔑 Keywords de Ejemplo"):
+                        for kw in family['keywords'][:10]:
+                            st.markdown(f"- {kw}")
+                
+                # Subfamilias
+                if 'subfamilies' in family and family['subfamilies']:
+                    st.markdown("### 📂 Subfamilias")
                     
-                    # Crear DataFrame para la matriz
-                    priority_data = []
-                    for opp in all_opportunities:
-                        priority_data.append({
-                            'Oportunidad': opp['nombre'],
-                            'Tipo': opp['tipo'],
-                            'Volumen': opp['volumen'],
-                            'Keywords': opp['keywords'],
-                            'Prioridad': opp['prioridad'],
-                            'Dificultad': opp['dificultad']
+                    subfam_data = []
+                    for subfam in family['subfamilies']:
+                        subfam_data.append({
+                            'Nombre': subfam['name'],
+                            'Keywords': subfam.get('keyword_count', 0),
+                            'Volumen': subfam.get('total_volume', 0),
+                            'Tipo': subfam.get('content_type', 'N/A')
                         })
                     
-                    priority_df = pd.DataFrame(priority_data)
-                    
-                    # Mostrar tabla interactiva
-                    st.dataframe(
-                        priority_df,
-                        use_container_width=True,
-                        height=400,
-                        column_config={
-                            "Volumen": st.column_config.NumberColumn(
-                                "Volumen",
-                                format="%d",
-                            ),
-                            "Keywords": st.column_config.NumberColumn(
-                                "Keywords",
-                                format="%d",
-                            ),
-                        }
-                    )
-                    
-                    # Botón de exportación rápida
-                    st.divider()
-                    col1, col2 = st.columns([3, 1])
-                    
-                    with col2:
-                        # Exportar solo oportunidades a CSV
-                        csv_opps = priority_df.to_csv(index=False)
-                        st.download_button(
-                            "📥 Exportar Oportunidades",
-                            data=csv_opps,
-                            file_name=f"oportunidades_{datetime.now().strftime('%Y%m%d')}.csv",
-                            mime="text/csv",
-                            type="primary"
-                        )
+                    if subfam_data:
+                        st.dataframe(pd.DataFrame(subfam_data), use_container_width=True)
                 
-                # Recomendaciones estratégicas
+                # Marcas
+                if 'brands' in family and family['brands']:
+                    st.markdown("### 🏷️ Marcas")
+                    
+                    brand_data = []
+                    for brand in family['brands']:
+                        brand_data.append({
+                            'Marca': brand['name'],
+                            'Keywords': brand.get('keyword_count', 0),
+                            'Volumen': brand.get('total_volume', 0)
+                        })
+                    
+                    if brand_data:
+                        st.dataframe(pd.DataFrame(brand_data), use_container_width=True)
+                
+                # Casos de uso
+                if 'use_cases' in family and family['use_cases']:
+                    st.markdown("### 💡 Casos de Uso")
+                    
+                    for use_case in family['use_cases']:
+                        with st.expander(f"{use_case['name']} (Vol: {use_case.get('total_volume', 0):,})"):
+                            st.markdown(use_case.get('description', 'No disponible'))
+                            st.markdown(f"**Tipo de contenido:** {use_case.get('content_type', 'N/A')}")
+                            if 'keywords' in use_case:
+                                st.markdown("**Keywords:**")
+                                st.markdown(", ".join(use_case['keywords'][:5]))
+            
+            # Estructura de URLs
+            if 'url_structure' in arch:
                 st.divider()
-                st.subheader("🎯 Recomendaciones Estratégicas")
+                st.subheader("🔗 Estructura de URLs Recomendada")
                 
-                recommendations = []
+                url_struct = arch['url_structure']
                 
-                if gaps_count > 0:
-                    recommendations.append({
-                        'titulo': 'Aprovechar Gaps de Contenido',
-                        'descripcion': f'Se identificaron {gaps_count} gaps con oportunidades de bajo competencia. Prioriza estos para quick wins.',
+                st.markdown(f"**Patrón:** {url_struct.get('pattern', 'N/A')}")
+                
+                if 'examples' in url_struct:
+                    st.markdown("**Ejemplos:**")
+                    for example in url_struct['examples']:
+                        st.code(example)
+            
+            # Navegación
+            if 'navigation_recommendations' in arch:
+                st.divider()
+                st.subheader("🧭 Recomendaciones de Navegación")
+                
+                nav = arch['navigation_recommendations']
+                
+                if 'primary_nav' in nav:
+                    st.markdown("**Navegación Principal:**")
+                    st.markdown(", ".join(nav['primary_nav']))
+                
+                if 'secondary_nav' in nav:
+                    st.markdown("**Navegación Secundaria:**")
+                    st.info(nav['secondary_nav'])
+            
+            # Enlazado interno
+            if 'internal_linking' in arch:
+                st.divider()
+                st.subheader("🔗 Estrategia de Enlazado Interno")
+                
+                linking = arch['internal_linking']
+                
+                st.markdown(linking.get('strategy', 'No disponible'))
+                
+                if 'hub_pages' in linking:
+                    st.markdown("**Hub Pages recomendadas:**")
+                    for hub in linking['hub_pages']:
+                        st.markdown(f"- {hub}")
+            
+            # Prioridades de contenido
+            if 'content_priorities' in arch:
+                st.divider()
+                st.subheader("📅 Roadmap de Implementación")
+                
+                for phase in arch['content_priorities']:
+                    with st.expander(f"**{phase['phase']}**"):
+                        st.markdown("**Familias prioritarias:**")
+                        for fam in phase['families']:
+                            st.markdown(f"- {fam}")
+                        st.markdown(f"**Justificación:** {phase['rationale']}")
+            
+            # Oportunidades SEO
+            if 'seo_opportunities' in arch:
+                st.divider()
+                st.subheader("🎯 Oportunidades SEO Identificadas")
+                
+                for opp in arch['seo_opportunities'][:5]:
+                    with st.expander(f"💡 {opp['opportunity']} (Vol: {opp.get('potential_volume', 0):,})"):
+                        st.markdown(f"**Dificultad:** {opp.get('difficulty', 'N/A')}")
+                        st.markdown(f"**Recomendación:** {opp.get('recommendation', 'N/A')}")
+            
+            # Exportar mapa del sitio
+            st.divider()
+            
+            if st.button("📄 Generar Mapa del Sitio (Texto)"):
+                sitemap = arch_service.export_architecture_to_sitemap(arch)
+                
+                st.text_area("Mapa del Sitio", sitemap, height=400)
+                
+                st.download_button(
+                    "💾 Descargar Mapa del Sitio",
+                    data=sitemap,
+                    file_name=f"sitemap_architecture_{datetime.now().strftime('%Y%m%d')}.txt",
+                    mime="text/plain"
+                )
+
+    # TAB 5: OPORTUNIDADES
+    with tab5:
+        st.header("🎯 Oportunidades Identificadas")
+        
+        if st.session_state.keyword_universe is None:
+            st.info("🧠 Primero realiza el análisis con IA en la pestaña 'Análisis con IA'")
+        else:
+            result = st.session_state.keyword_universe
+            
+            # Resumen ejecutivo de oportunidades
+            st.subheader("📊 Resumen de Oportunidades")
+            
+            # Calcular totales
+            total_opportunities = 0
+            gaps_count = len(result.get('gaps', []))
+            trends_count = len(result.get('trends', []))
+            tier1_count = len([t for t in result.get('topics', []) if t.get('tier') == 1])
+            
+            if 'topics_openai' in result:
+                tier1_openai = len([t for t in result.get('topics_openai', []) if t.get('tier') == 1])
+                tier1_count = max(tier1_count, tier1_openai)
+            
+            total_opportunities = gaps_count + trends_count + tier1_count
+            
+            # Métricas principales
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric(
+                    "Total Oportunidades",
+                    total_opportunities,
+                    help="Suma de gaps, tendencias y topics Tier 1"
+                )
+            
+            with col2:
+                st.metric(
+                    "Gaps de Contenido",
+                    gaps_count,
+                    help="Topics con alto volumen pero poca cobertura"
+                )
+            
+            with col3:
+                st.metric(
+                    "Tendencias Emergentes",
+                    trends_count,
+                    help="Keywords en crecimiento"
+                )
+            
+            with col4:
+                st.metric(
+                    "Topics Prioritarios",
+                    tier1_count,
+                    help="Topics Tier 1 - máxima prioridad"
+                )
+            
+            st.divider()
+            
+            # Filtros y ordenación
+            col1, col2 = st.columns([3, 1])
+            
+            with col1:
+                opportunity_filter = st.multiselect(
+                    "Filtrar por tipo de oportunidad",
+                    ["Gaps de Contenido", "Tendencias", "Topics Tier 1"],
+                    default=["Gaps de Contenido", "Tendencias", "Topics Tier 1"]
+                )
+            
+            with col2:
+                sort_by = st.selectbox(
+                    "Ordenar por",
+                    ["Volumen (mayor)", "Volumen (menor)", "Nombre"]
+                )
+            
+            # Preparar todas las oportunidades
+            all_opportunities = []
+            
+            # 1. Gaps de contenido
+            if "Gaps de Contenido" in opportunity_filter and gaps_count > 0:
+                for gap in result['gaps']:
+                    all_opportunities.append({
+                        'tipo': 'Gap de Contenido',
+                        'nombre': gap.get('topic', 'N/A'),
+                        'volumen': gap.get('volume', 0),
+                        'keywords': gap.get('keyword_count', 0),
                         'prioridad': 'Alta',
-                        'timeframe': 'Inmediato (0-2 semanas)'
+                        'dificultad': gap.get('difficulty', 'medium'),
+                        'descripcion': gap.get('description', ''),
+                        'tier_badge': 'badge-tier-1',
+                        'icon': '🎯'
                     })
-                
-                if trends_count > 0:
-                    recommendations.append({
-                        'titulo': 'Capitalizar Tendencias Emergentes',
-                        'descripcion': f'{trends_count} tendencias en crecimiento detectadas. Actúa rápido para posicionarte como líder.',
-                        'prioridad': 'Alta',
-                        'timeframe': 'Corto plazo (2-4 semanas)'
+            
+            # 2. Tendencias emergentes
+            if "Tendencias" in opportunity_filter and trends_count > 0:
+                for trend in result['trends']:
+                    all_opportunities.append({
+                        'tipo': 'Tendencia Emergente',
+                        'nombre': trend.get('trend', 'N/A'),
+                        'volumen': trend.get('total_volume', 0),
+                        'keywords': len(trend.get('keywords', [])),
+                        'prioridad': 'Media',
+                        'dificultad': 'variable',
+                        'descripcion': trend.get('insight', ''),
+                        'tier_badge': 'badge-tier-2',
+                        'icon': '📈'
                     })
+            
+            # 3. Topics Tier 1
+            if "Topics Tier 1" in opportunity_filter and tier1_count > 0:
+                tier1_topics = [t for t in result.get('topics', []) if t.get('tier') == 1]
                 
-                if tier1_count > 0:
-                    recommendations.append({
-                        'titulo': 'Desarrollar Topics Tier 1',
-                        'descripcion': f'{tier1_count} topics prioritarios identificados. Alto volumen y relevancia estratégica.',
-                        'prioridad': 'Media-Alta',
-                        'timeframe': 'Medio plazo (1-3 meses)'
+                for topic in tier1_topics:
+                    all_opportunities.append({
+                        'tipo': 'Topic Prioritario',
+                        'nombre': topic.get('topic', 'N/A'),
+                        'volumen': topic.get('volume', 0),
+                        'keywords': topic.get('keyword_count', 0),
+                        'prioridad': topic.get('priority', 'high'),
+                        'dificultad': 'variable',
+                        'descripcion': topic.get('description', ''),
+                        'tier_badge': 'badge-tier-1',
+                        'icon': '⭐'
                     })
+            
+            # Ordenar según filtro
+            if sort_by == "Volumen (mayor)":
+                all_opportunities.sort(key=lambda x: x['volumen'], reverse=True)
+            elif sort_by == "Volumen (menor)":
+                all_opportunities.sort(key=lambda x: x['volumen'])
+            else:  # Nombre
+                all_opportunities.sort(key=lambda x: x['nombre'])
+            
+            # Mostrar oportunidades
+            if not all_opportunities:
+                st.warning("No hay oportunidades que coincidan con los filtros seleccionados")
+            else:
+                st.subheader(f"📋 {len(all_opportunities)} Oportunidades Encontradas")
                 
-                # Mostrar recomendaciones
-                for rec in recommendations:
-                    with st.container():
-                        st.markdown(f"### {rec['titulo']}")
-                        st.write(rec['descripcion'])
+                # Mostrar en cards expandibles
+                for i, opp in enumerate(all_opportunities):
+                    with st.expander(
+                        f"{opp['icon']} {opp['nombre']} - {format_number(opp['volumen'])} búsquedas/mes",
+                        expanded=(i < 5)  # Primeras 5 expandidas
+                    ):
+                        # Header con badges
+                        col1, col2, col3 = st.columns([2, 1, 1])
                         
-                        col1, col2 = st.columns(2)
                         with col1:
-                            st.markdown(f"**Prioridad:** {rec['prioridad']}")
+                            st.markdown(f"**Tipo:** {opp['tipo']}")
+                        
                         with col2:
-                            st.markdown(f"**Timeline:** {rec['timeframe']}")
+                            st.markdown(
+                                f"<span class='{opp['tier_badge']}'>{opp['prioridad'].upper()}</span>",
+                                unsafe_allow_html=True
+                            )
+                        
+                        with col3:
+                            st.markdown(f"**Dificultad:** {opp['dificultad'].title()}")
                         
                         st.divider()
-    # TAB 5: Exportar
-    with tab5:
+                        
+                        # Métricas
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.metric("Volumen Total", f"{opp['volumen']:,}")
+                        
+                        with col2:
+                            st.metric("Keywords Relacionadas", opp['keywords'])
+                        
+                        # Descripción
+                        st.markdown("**Descripción:**")
+                        st.write(opp['descripcion'])
+                        
+                        # Acciones recomendadas
+                        st.markdown("**Acción Recomendada:**")
+                        if opp['tipo'] == 'Gap de Contenido':
+                            st.info("💡 Crear contenido completo que cubra este tema. Poca competencia actual.")
+                        elif opp['tipo'] == 'Tendencia Emergente':
+                            st.info("💡 Actuar rápido para posicionarse antes que la competencia.")
+                        else:  # Topic Prioritario
+                            st.info("💡 Priorizar en la estrategia de contenido. Alto ROI potencial.")
+            
+            # Sección de priorización
+            if all_opportunities:
+                st.divider()
+                st.subheader("📊 Matriz de Priorización")
+                
+                # Crear DataFrame para la matriz
+                priority_data = []
+                for opp in all_opportunities:
+                    priority_data.append({
+                        'Oportunidad': opp['nombre'],
+                        'Tipo': opp['tipo'],
+                        'Volumen': opp['volumen'],
+                        'Keywords': opp['keywords'],
+                        'Prioridad': opp['prioridad'],
+                        'Dificultad': opp['dificultad']
+                    })
+                
+                priority_df = pd.DataFrame(priority_data)
+                
+                # Mostrar tabla interactiva
+                st.dataframe(
+                    priority_df,
+                    use_container_width=True,
+                    height=400,
+                    column_config={
+                        "Volumen": st.column_config.NumberColumn(
+                            "Volumen",
+                            format="%d",
+                        ),
+                        "Keywords": st.column_config.NumberColumn(
+                            "Keywords",
+                            format="%d",
+                        ),
+                    }
+                )
+                
+                # Botón de exportación rápida
+                st.divider()
+                col1, col2 = st.columns([3, 1])
+                
+                with col2:
+                    # Exportar solo oportunidades a CSV
+                    csv_opps = priority_df.to_csv(index=False)
+                    st.download_button(
+                        "📥 Exportar Oportunidades",
+                        data=csv_opps,
+                        file_name=f"oportunidades_{datetime.now().strftime('%Y%m%d')}.csv",
+                        mime="text/csv",
+                        type="primary"
+                    )
+            
+            # Recomendaciones estratégicas
+            st.divider()
+            st.subheader("🎯 Recomendaciones Estratégicas")
+            
+            recommendations = []
+            
+            if gaps_count > 0:
+                recommendations.append({
+                    'titulo': 'Aprovechar Gaps de Contenido',
+                    'descripcion': f'Se identificaron {gaps_count} gaps con oportunidades de bajo competencia. Prioriza estos para quick wins.',
+                    'prioridad': 'Alta',
+                    'timeframe': 'Inmediato (0-2 semanas)'
+                })
+            
+            if trends_count > 0:
+                recommendations.append({
+                    'titulo': 'Capitalizar Tendencias Emergentes',
+                    'descripcion': f'{trends_count} tendencias en crecimiento detectadas. Actúa rápido para posicionarte como líder.',
+                    'prioridad': 'Alta',
+                    'timeframe': 'Corto plazo (2-4 semanas)'
+                })
+            
+            if tier1_count > 0:
+                recommendations.append({
+                    'titulo': 'Desarrollar Topics Tier 1',
+                    'descripcion': f'{tier1_count} topics prioritarios identificados. Alto volumen y relevancia estratégica.',
+                    'prioridad': 'Media-Alta',
+                    'timeframe': 'Medio plazo (1-3 meses)'
+                })
+            
+            # Mostrar recomendaciones
+            for rec in recommendations:
+                with st.container():
+                    st.markdown(f"### {rec['titulo']}")
+                    st.write(rec['descripcion'])
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.markdown(f"**Prioridad:** {rec['prioridad']}")
+                    with col2:
+                        st.markdown(f"**Timeline:** {rec['timeframe']}")
+                    
+                    st.divider()
+    
+    # TAB 6: Exportar (MOVIDO DE TAB 5)
+    with tab6:
         st.header("Exportar Resultados")
         
         if st.session_state.keyword_universe is None:
@@ -1520,6 +1877,78 @@ domain|another-site.com""",
                 tier_dist = topics_df.groupby('tier').size()
                 for tier, count in tier_dist.items():
                     st.text(f"Tier {tier}: {count} topics")
+        
+        # EXPORTAR ARQUITECTURA (NUEVO)
+        if st.session_state.architecture:
+            st.divider()
+            st.subheader("🏗️ Exportar Arquitectura Web")
+            
+            arch_format = st.radio(
+                "Formato de arquitectura",
+                ["JSON", "Excel", "Mapa del Sitio (TXT)"],
+                horizontal=True
+            )
+            
+            if st.button("💾 Exportar Arquitectura", key="export_arch"):
+                try:
+                    if arch_format == "JSON":
+                        import json
+                        json_data = json.dumps(st.session_state.architecture, indent=2, ensure_ascii=False)
+                        st.download_button(
+                            "⬇️ Descargar Arquitectura JSON",
+                            data=json_data,
+                            file_name=f"web_architecture_{datetime.now().strftime('%Y%m%d')}.json",
+                            mime="application/json"
+                        )
+                    elif arch_format == "Excel":
+                        # Crear Excel con arquitectura
+                        output = BytesIO()
+                        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                            # Resumen
+                            summary_df = pd.DataFrame({
+                                'Sección': ['Resumen'],
+                                'Contenido': [st.session_state.architecture.get('summary', 'N/A')]
+                            })
+                            summary_df.to_excel(writer, sheet_name='Resumen', index=False)
+                            
+                            # Familias
+                            families_data = []
+                            for fam in st.session_state.architecture.get('families', []):
+                                families_data.append({
+                                    'Familia': fam['name'],
+                                    'Slug': fam.get('slug', ''),
+                                    'Prioridad': fam.get('priority', ''),
+                                    'Keywords': fam.get('keyword_count', 0),
+                                    'Volumen': fam.get('total_volume', 0),
+                                    'Tier': fam.get('tier', '')
+                                })
+                            
+                            if families_data:
+                                families_df = pd.DataFrame(families_data)
+                                families_df.to_excel(writer, sheet_name='Familias', index=False)
+                        
+                        output.seek(0)
+                        st.download_button(
+                            "⬇️ Descargar Arquitectura Excel",
+                            data=output.getvalue(),
+                            file_name=f"web_architecture_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+                    else:  # Mapa del Sitio
+                        arch_service = WebArchitectureService()
+                        sitemap = arch_service.export_architecture_to_sitemap(
+                            st.session_state.architecture
+                        )
+                        st.download_button(
+                            "⬇️ Descargar Mapa del Sitio",
+                            data=sitemap,
+                            file_name=f"sitemap_{datetime.now().strftime('%Y%m%d')}.txt",
+                            mime="text/plain"
+                        )
+                    
+                    st.success("✅ Arquitectura exportada")
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
 
 if __name__ == "__main__":
     main()
