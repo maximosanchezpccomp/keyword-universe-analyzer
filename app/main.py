@@ -372,29 +372,45 @@ def main():
             min_volume = st.number_input("Volumen mínimo de búsqueda", 
                                         min_value=0, value=10)
             
-            # Selección de modelo según proveedor
-            if ai_provider == "Claude (Anthropic)":
-                model_choice = st.selectbox("Modelo Claude", 
-                                           ["claude-sonnet-4-5-20250929", 
-                                            "claude-opus-4-20250514"])
-            elif ai_provider == "OpenAI":
-                model_choice = st.selectbox("Modelo OpenAI",
-                                           ["gpt-4o",
-                                            "gpt-4-turbo",
-                                            "gpt-4",
-                                            "gpt-3.5-turbo"])
-            else:  # Ambos
-                col1, col2 = st.columns(2)
-                with col1:
-                    claude_model = st.selectbox("Modelo Claude", 
-                                               ["claude-sonnet-4-5-20250929", 
-                                                "claude-opus-4-20250514"])
-                with col2:
-                    openai_model = st.selectbox("Modelo OpenAI",
-                                               ["gpt-4o",
-                                                "gpt-4-turbo"])
-        
-        st.divider()
+        # Configuración del análisis
+                with st.expander("🎯 Parámetros de Análisis"):
+                    max_keywords = st.slider("Máximo de keywords por competidor", 
+                                            100, 5000, 1000, 100)
+                    min_volume = st.number_input("Volumen mínimo de búsqueda", 
+                                                min_value=0, value=10)
+                    
+                    # Selección de modelo según proveedor
+                    # Inicializar variables por defecto
+                    model_choice = None
+                    claude_model = "claude-sonnet-4-5-20250929"
+                    openai_model = "gpt-4o"
+                    
+                    if ai_provider == "Claude (Anthropic)":
+                        model_choice = st.selectbox("Modelo Claude", 
+                                                   ["claude-sonnet-4-5-20250929", 
+                                                    "claude-opus-4-20250514"])
+                        claude_model = model_choice  # Asignar también a claude_model
+                        
+                    elif ai_provider == "OpenAI":
+                        model_choice = st.selectbox("Modelo OpenAI",
+                                                   ["gpt-4o",
+                                                    "gpt-4-turbo",
+                                                    "gpt-4",
+                                                    "gpt-3.5-turbo"])
+                        openai_model = model_choice  # Asignar también a openai_model
+                        
+                    else:  # Ambos
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            claude_model = st.selectbox("Modelo Claude", 
+                                                       ["claude-sonnet-4-5-20250929", 
+                                                        "claude-opus-4-20250514"])
+                        with col2:
+                            openai_model = st.selectbox("Modelo OpenAI",
+                                                       ["gpt-4o",
+                                                        "gpt-4-turbo"])
+                        # model_choice no se usa en modo "Ambos", pero definirlo para evitar errores
+                        model_choice = claude_model
         
         # Sistema de Caché
         with st.expander("💾 Análisis Guardados", expanded=False):
@@ -1296,7 +1312,12 @@ domain|another-site.com""",
                         openai_service = OpenAIService(openai_key, model_choice if arch_provider == "OpenAI" else openai_model)
                     
                     # Crear servicio de arquitectura
-                    arch_service = ArchitectureService(claude_service, openai_service)
+                    arch_service = ArchitectureService(
+                        anthropic_key=anthropic_key if arch_provider in ["Claude (Anthropic)", "Ambos (Validación Cruzada)"] else None,
+                        openai_key=openai_key if arch_provider in ["OpenAI", "Ambos (Validación Cruzada)"] else None,
+                        claude_model=claude_model,
+                        openai_model=openai_model
+                    )
                     
                     # Extraer todos los análisis
                     all_analyses = [a['result'] for a in st.session_state.analyses_history]
