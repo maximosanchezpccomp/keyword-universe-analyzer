@@ -11,7 +11,9 @@ from app.utils.helpers import (
     filter_keywords_by_intent,
     detect_keyword_patterns,
     create_content_calendar,
-    validate_dataframe
+    validate_dataframe,
+    get_safe_columns,
+    safe_preview_dataframe
 )
 
 from app.utils.prompts import (
