@@ -336,3 +336,84 @@ def validate_dataframe(df: pd.DataFrame) -> Dict[str, Any]:
         'row_count': len(df),
         'column_count': len(df.columns)
     }
+
+def validate_dataframe(df: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Valida un DataFrame de keywords y retorna un reporte
+    
+    Returns:
+        Diccionario con el resultado de la validación
+    """
+    issues = []
+    warnings = []
+    
+    # Verificar columnas requeridas
+    required_cols = ['keyword', 'volume']
+    for col in required_cols:
+        if col not in df.columns:
+            issues.append(f"Columna requerida '{col}' no encontrada")
+    
+    # Verificar datos nulos
+    if df['keyword'].isnull().any():
+        null_count = df['keyword'].isnull().sum()
+        warnings.append(f"{null_count} keywords nulas encontradas")
+    
+    # Verificar volúmenes negativos o cero
+    if 'volume' in df.columns:
+        zero_volume = (df['volume'] <= 0).sum()
+        if zero_volume > 0:
+            warnings.append(f"{zero_volume} keywords con volumen 0 o negativo")
+    
+    # Verificar duplicados
+    duplicates = df['keyword'].duplicated().sum()
+    if duplicates > 0:
+        warnings.append(f"{duplicates} keywords duplicadas encontradas")
+    
+    return {
+        'valid': len(issues) == 0,
+        'issues': issues,
+        'warnings': warnings,
+        'row_count': len(df),
+        'column_count': len(df.columns)
+    }
+
+
+def get_safe_columns(df: pd.DataFrame, desired_columns: List[str]) -> List[str]:
+    """
+    Retorna solo las columnas que existen en el DataFrame
+    
+    Args:
+        df: DataFrame a verificar
+        desired_columns: Lista de columnas deseadas
+    
+    Returns:
+        Lista de columnas que existen en el DataFrame
+    """
+    return [col for col in desired_columns if col in df.columns]
+
+
+def safe_preview_dataframe(df: pd.DataFrame, n: int = 20) -> pd.DataFrame:
+    """
+    Retorna un preview seguro del DataFrame con las columnas disponibles
+    
+    Args:
+        df: DataFrame completo
+        n: Número de filas para el preview
+    
+    Returns:
+        DataFrame con solo las columnas que existen
+    """
+    # Columnas preferidas en orden
+    preferred_columns = [
+        'keyword', 'volume', 'traffic', 'position', 
+        'cpc', 'difficulty', 'url', 'source_type', 'source'
+    ]
+    
+    # Obtener columnas disponibles
+    available_columns = get_safe_columns(df, preferred_columns)
+    
+    # Si no hay columnas preferidas, usar todas
+    if not available_columns:
+        available_columns = df.columns.tolist()
+    
+    return df[available_columns].head(n)
