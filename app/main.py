@@ -365,52 +365,45 @@ def main():
             semrush_key = st.text_input("Semrush API Key", type="password",
                                        help="Tu API key de Semrush (opcional)")
         
-        # Configuración del análisis
+        # Configuración del análisis - CORREGIDO: SOLO UN BLOQUE
         with st.expander("🎯 Parámetros de Análisis"):
             max_keywords = st.slider("Máximo de keywords por competidor", 
                                     100, 5000, 1000, 100)
             min_volume = st.number_input("Volumen mínimo de búsqueda", 
                                         min_value=0, value=10)
             
-        # Configuración del análisis
-                with st.expander("🎯 Parámetros de Análisis"):
-                    max_keywords = st.slider("Máximo de keywords por competidor", 
-                                            100, 5000, 1000, 100)
-                    min_volume = st.number_input("Volumen mínimo de búsqueda", 
-                                                min_value=0, value=10)
-                    
-                    # Selección de modelo según proveedor
-                    # Inicializar variables por defecto
-                    model_choice = None
-                    claude_model = "claude-sonnet-4-5-20250929"
-                    openai_model = "gpt-4o"
-                    
-                    if ai_provider == "Claude (Anthropic)":
-                        model_choice = st.selectbox("Modelo Claude", 
-                                                   ["claude-sonnet-4-5-20250929", 
-                                                    "claude-opus-4-20250514"])
-                        claude_model = model_choice  # Asignar también a claude_model
-                        
-                    elif ai_provider == "OpenAI":
-                        model_choice = st.selectbox("Modelo OpenAI",
-                                                   ["gpt-4o",
-                                                    "gpt-4-turbo",
-                                                    "gpt-4",
-                                                    "gpt-3.5-turbo"])
-                        openai_model = model_choice  # Asignar también a openai_model
-                        
-                    else:  # Ambos
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            claude_model = st.selectbox("Modelo Claude", 
-                                                       ["claude-sonnet-4-5-20250929", 
-                                                        "claude-opus-4-20250514"])
-                        with col2:
-                            openai_model = st.selectbox("Modelo OpenAI",
-                                                       ["gpt-4o",
-                                                        "gpt-4-turbo"])
-                        # model_choice no se usa en modo "Ambos", pero definirlo para evitar errores
-                        model_choice = claude_model
+            # Inicializar variables por defecto
+            model_choice = None
+            claude_model = "claude-sonnet-4-5-20250929"
+            openai_model = "gpt-4o"
+            
+            # Selección de modelo según proveedor
+            if ai_provider == "Claude (Anthropic)":
+                model_choice = st.selectbox("Modelo Claude", 
+                                           ["claude-sonnet-4-5-20250929", 
+                                            "claude-opus-4-20250514"])
+                claude_model = model_choice  # Asignar también a claude_model
+                
+            elif ai_provider == "OpenAI":
+                model_choice = st.selectbox("Modelo OpenAI",
+                                           ["gpt-4o",
+                                            "gpt-4-turbo",
+                                            "gpt-4",
+                                            "gpt-3.5-turbo"])
+                openai_model = model_choice  # Asignar también a openai_model
+                
+            else:  # Ambos
+                col1, col2 = st.columns(2)
+                with col1:
+                    claude_model = st.selectbox("Modelo Claude", 
+                                               ["claude-sonnet-4-5-20250929", 
+                                                "claude-opus-4-20250514"])
+                with col2:
+                    openai_model = st.selectbox("Modelo OpenAI",
+                                               ["gpt-4o",
+                                                "gpt-4-turbo"])
+                # model_choice no se usa en modo "Ambos", pero definirlo para evitar errores
+                model_choice = claude_model
         
         # Sistema de Caché
         with st.expander("💾 Análisis Guardados", expanded=False):
@@ -896,7 +889,7 @@ domain|another-site.com""",
                         try:
                             if ai_provider == "Claude (Anthropic)":
                                 # Análisis con Claude
-                                anthropic_service = AnthropicService(anthropic_key, model_choice)
+                                anthropic_service = AnthropicService(anthropic_key, claude_model)
                                 
                                 prompt = anthropic_service.create_universe_prompt(
                                     df,
@@ -910,13 +903,13 @@ domain|another-site.com""",
                                 
                                 result = anthropic_service.analyze_keywords(prompt, df)
                                 result['provider'] = 'Claude'
-                                result['model'] = model_choice
+                                result['model'] = claude_model
                                 
                             elif ai_provider == "OpenAI":
                                 # Análisis con OpenAI
                                 from app.services.openai_service import OpenAIService
                                 
-                                openai_service = OpenAIService(openai_key, model_choice)
+                                openai_service = OpenAIService(openai_key, openai_model)
                                 
                                 messages = openai_service.create_universe_prompt(
                                     df,
@@ -930,7 +923,7 @@ domain|another-site.com""",
                                 
                                 result = openai_service.analyze_keywords(messages, df)
                                 result['provider'] = 'OpenAI'
-                                result['model'] = model_choice
+                                result['model'] = openai_model
                                 
                             else:  # Ambos (Validación Cruzada)
                                 from app.services.openai_service import OpenAIService
@@ -1208,125 +1201,61 @@ domain|another-site.com""",
         st.header("🏗️ Propuesta de Arquitectura Web")
         
         # Verificar que hay análisis previos
-        if not st.session_state.analyses_history:
+        if not st.session_state.keyword_universe:
             st.info("🧠 Primero realiza al menos un análisis en la pestaña 'Análisis con IA'")
             st.markdown("""
             ### ¿Qué es la Arquitectura Web?
             
             Esta funcionalidad genera una propuesta completa de estructura para tu sitio web basada en:
-            - Todos los análisis de keywords realizados
+            - El análisis de keywords realizado
             - Patrones de búsqueda identificados
             - Intención del usuario
             - Volumen y prioridad estratégica
-            
-            La arquitectura se organiza en:
-            - **Familias**: Categorías principales (nivel 1)
-            - **Subfamilias**: Subcategorías (nivel 2)
-            - **Marcas**: Agrupaciones por fabricante/marca
-            - **Casos de uso**: Agrupaciones por aplicación específica
             """)
             return
         
-        # Mostrar resumen de análisis disponibles
-        st.subheader("📊 Análisis Disponibles")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric("Análisis Realizados", len(st.session_state.analyses_history))
-        with col2:
-            total_topics = sum([len(a['result'].get('topics', [])) for a in st.session_state.analyses_history])
-            st.metric("Topics Identificados", total_topics)
-        with col3:
-            if st.session_state.processed_data is not None:
-                st.metric("Keywords Totales", f"{len(st.session_state.processed_data):,}")
-        
-        # Mostrar lista de análisis
-        with st.expander("👁️ Ver análisis realizados", expanded=False):
-            for i, analysis in enumerate(st.session_state.analyses_history, 1):
-                st.markdown(f"""
-                **Análisis {i}** ({analysis['analysis_type']})
-                - Proveedor: {analysis['provider']}
-                - Fecha: {analysis['timestamp'].strftime('%Y-%m-%d %H:%M')}
-                - Topics: {len(analysis['result'].get('topics', []))}
-                """)
-        
-        st.divider()
-        
-        # Configuración de la arquitectura
         st.subheader("⚙️ Configuración")
         
-        col1, col2 = st.columns([2, 1])
+        arch_provider = st.radio(
+            "Proveedor de IA para arquitectura",
+            ["Claude", "OpenAI", "Ambos"],
+            horizontal=True,
+            help="Claude es más estratégico. OpenAI es más rápido."
+        )
         
-        with col1:
-            arch_provider = st.radio(
-                "Proveedor de IA para arquitectura",
-                ["Claude (Anthropic)", "OpenAI", "Ambos (Validación Cruzada)"],
-                horizontal=True,
-                help="Claude es más estratégico. OpenAI es más rápido. Ambos te da dos perspectivas."
-            )
-            
-            custom_arch_instructions = st.text_area(
-                "Instrucciones adicionales (opcional)",
-                placeholder="Ej: Enfócate en categorías de producto, prioriza marcas premium, estructura para e-commerce, etc.",
-                height=100
-            )
-        
-        with col2:
-            st.markdown("### 💡 Tips")
-            st.info("""
-            **Recomendaciones:**
-            - Usa todos tus análisis
-            - Claude es mejor para estrategia
-            - OpenAI es más rápido
-            - Validación Cruzada da máxima confianza
-            """)
+        custom_arch_instructions = st.text_area(
+            "Instrucciones adicionales (opcional)",
+            placeholder="Ej: Enfócate en categorías de producto, prioriza marcas premium, estructura para e-commerce, etc.",
+            height=100
+        )
         
         # Botón para generar arquitectura
         if st.button("🏗️ Generar Arquitectura Web", type="primary", use_container_width=True):
             
-            # Validar API keys según proveedor
-            provider_map = {
-                "Claude (Anthropic)": ("claude", anthropic_key, "Anthropic"),
-                "OpenAI": ("openai", openai_key, "OpenAI"),
-                "Ambos (Validación Cruzada)": ("both", anthropic_key and openai_key, "ambas")
-            }
-            
-            provider_key, api_key_check, provider_name = provider_map[arch_provider]
-            
-            if not api_key_check:
-                st.error(f"⚠️ Necesitas la API key de {provider_name}")
+            # Validar API keys
+            if arch_provider in ["Claude", "Ambos"] and not anthropic_key:
+                st.error("⚠️ Necesitas la API key de Anthropic")
                 return
             
-            with st.spinner(f"🏗️ Generando arquitectura web con {arch_provider}..."):
+            if arch_provider in ["OpenAI", "Ambos"] and not openai_key:
+                st.error("⚠️ Necesitas la API key de OpenAI")
+                return
+            
+            with st.spinner(f"🏗️ Generando arquitectura web..."):
                 try:
-                    # Preparar servicios
-                    claude_service = None
-                    openai_service = None
-                    
-                    if provider_key in ["claude", "both"] and anthropic_key:
-                        claude_service = AnthropicService(anthropic_key, model_choice if arch_provider == "Claude (Anthropic)" else claude_model)
-                    
-                    if provider_key in ["openai", "both"] and openai_key:
-                        from app.services.openai_service import OpenAIService
-                        openai_service = OpenAIService(openai_key, model_choice if arch_provider == "OpenAI" else openai_model)
-                    
                     # Crear servicio de arquitectura
                     arch_service = ArchitectureService(
-                        anthropic_key=anthropic_key if arch_provider in ["Claude (Anthropic)", "Ambos (Validación Cruzada)"] else None,
-                        openai_key=openai_key if arch_provider in ["OpenAI", "Ambos (Validación Cruzada)"] else None,
+                        anthropic_key=anthropic_key if arch_provider in ["Claude", "Ambos"] else None,
+                        openai_key=openai_key if arch_provider in ["OpenAI", "Ambos"] else None,
                         claude_model=claude_model,
                         openai_model=openai_model
                     )
                     
-                    # Extraer todos los análisis
-                    all_analyses = [a['result'] for a in st.session_state.analyses_history]
-                    
                     # Generar arquitectura
                     architecture = arch_service.generate_architecture(
-                        analysis_results=all_analyses,
+                        analysis_results=st.session_state.keyword_universe,
                         df=st.session_state.processed_data,
-                        provider=provider_key,
+                        provider=arch_provider,
                         custom_instructions=custom_arch_instructions
                     )
                     
@@ -1361,189 +1290,56 @@ domain|another-site.com""",
             
             # Resumen ejecutivo
             with st.expander("📊 Resumen Ejecutivo", expanded=True):
-                st.markdown(arch.get('summary', 'No disponible'))
+                st.markdown(arch.get('overview', 'No disponible'))
             
-            # Si es validación cruzada, mostrar comparación
-            if arch.get('provider') == 'Ambos' and 'comparison' in arch:
-                with st.expander("🔄 Comparación de Propuestas", expanded=False):
-                    comp = arch['comparison']
-                    st.markdown("**Análisis Comparativo:**")
-                    st.info(comp.get('comparison', 'N/A'))
-                    
-                    if 'common_families' in comp:
-                        st.markdown("**Familias Comunes:**")
-                        for family in comp['common_families']:
-                            st.markdown(f"- {family}")
-                    
-                    st.markdown("**Recomendación:**")
-                    st.success(comp.get('recommendation', 'N/A'))
+            # Estructura del sitio
+            if 'site_structure' in arch and 'main_sections' in arch['site_structure']:
+                st.subheader("🗂️ Estructura del Sitio")
+                
+                sections = arch['site_structure']['main_sections']
+                
+                for section in sections:
+                    with st.expander(f"📁 {section.get('section_name', 'N/A')} - {section.get('priority', 'N/A').upper()}"):
+                        st.markdown(f"**URL:** `{section.get('url_structure', 'N/A')}`")
+                        st.markdown(f"**Tipo:** {section.get('page_type', 'N/A')}")
+                        st.markdown(f"**Descripción:** {section.get('description', 'N/A')}")
+                        
+                        if 'target_topics' in section:
+                            st.markdown("**Topics objetivo:**")
+                            for topic in section['target_topics']:
+                                st.markdown(f"- {topic}")
+                        
+                        if 'subsections' in section and section['subsections']:
+                            st.markdown("**Subsecciones:**")
+                            for subsection in section['subsections']:
+                                st.markdown(f"- `{subsection.get('url', 'N/A')}` - {subsection.get('name', 'N/A')}")
             
-            # Familias principales
-            st.subheader("📁 Familias de Contenido")
-            
-            families = arch.get('families', [])
-            
-            if families:
-                # Selector de familia
-                selected_family_idx = st.selectbox(
-                    "Selecciona una familia para ver detalles",
-                    range(len(families)),
-                    format_func=lambda x: f"{families[x]['name']} (Vol: {families[x].get('total_volume', 0):,})"
-                )
-                
-                family = families[selected_family_idx]
-                
-                # Detalles de la familia seleccionada
-                st.markdown(f"## 🏷️ {family['name']}")
-                
-                # Métricas
-                col1, col2, col3, col4 = st.columns(4)
-                with col1:
-                    st.metric("Prioridad", family.get('priority', 'N/A').upper())
-                with col2:
-                    st.metric("Keywords", f"{family.get('keyword_count', 0):,}")
-                with col3:
-                    st.metric("Volumen Total", f"{family.get('total_volume', 0):,}")
-                with col4:
-                    st.metric("Tier", family.get('tier', 'N/A'))
-                
-                # Descripción
-                st.markdown("**Descripción:**")
-                st.info(family.get('description', 'No disponible'))
-                
-                # Estrategia de contenido
-                if 'content_strategy' in family:
-                    st.markdown("**Estrategia de Contenido:**")
-                    st.markdown(family['content_strategy'])
-                
-                # Keywords de ejemplo
-                if 'keywords' in family and family['keywords']:
-                    with st.expander("🔑 Keywords de Ejemplo"):
-                        for kw in family['keywords'][:10]:
-                            st.markdown(f"- {kw}")
-                
-                # Subfamilias
-                if 'subfamilies' in family and family['subfamilies']:
-                    st.markdown("### 📂 Subfamilias")
-                    
-                    subfam_data = []
-                    for subfam in family['subfamilies']:
-                        subfam_data.append({
-                            'Nombre': subfam['name'],
-                            'Keywords': subfam.get('keyword_count', 0),
-                            'Volumen': subfam.get('total_volume', 0),
-                            'Tipo': subfam.get('content_type', 'N/A')
-                        })
-                    
-                    if subfam_data:
-                        st.dataframe(pd.DataFrame(subfam_data), use_container_width=True)
-                
-                # Marcas
-                if 'brands' in family and family['brands']:
-                    st.markdown("### 🏷️ Marcas")
-                    
-                    brand_data = []
-                    for brand in family['brands']:
-                        brand_data.append({
-                            'Marca': brand['name'],
-                            'Keywords': brand.get('keyword_count', 0),
-                            'Volumen': brand.get('total_volume', 0)
-                        })
-                    
-                    if brand_data:
-                        st.dataframe(pd.DataFrame(brand_data), use_container_width=True)
-                
-                # Casos de uso
-                if 'use_cases' in family and family['use_cases']:
-                    st.markdown("### 💡 Casos de Uso")
-                    
-                    for use_case in family['use_cases']:
-                        with st.expander(f"{use_case['name']} (Vol: {use_case.get('total_volume', 0):,})"):
-                            st.markdown(use_case.get('description', 'No disponible'))
-                            st.markdown(f"**Tipo de contenido:** {use_case.get('content_type', 'N/A')}")
-                            if 'keywords' in use_case:
-                                st.markdown("**Keywords:**")
-                                st.markdown(", ".join(use_case['keywords'][:5]))
-            
-            # Estructura de URLs
-            if 'url_structure' in arch:
+            # Estrategia de contenido
+            if 'content_strategy' in arch:
                 st.divider()
-                st.subheader("🔗 Estructura de URLs Recomendada")
+                st.subheader("📝 Estrategia de Contenido")
                 
-                url_struct = arch['url_structure']
+                content_strat = arch['content_strategy']
                 
-                st.markdown(f"**Patrón:** {url_struct.get('pattern', 'N/A')}")
-                
-                if 'examples' in url_struct:
-                    st.markdown("**Ejemplos:**")
-                    for example in url_struct['examples']:
-                        st.code(example)
+                if 'pillar_pages' in content_strat:
+                    st.markdown("**Páginas Pillar:**")
+                    for pillar in content_strat['pillar_pages']:
+                        with st.expander(f"🏛️ {pillar.get('title', 'N/A')}"):
+                            st.markdown(f"**URL:** `{pillar.get('url', 'N/A')}`")
+                            st.markdown(f"**Palabras estimadas:** {pillar.get('estimated_word_count', 0):,}")
+                            st.markdown(f"**Artículos de soporte:** {pillar.get('supporting_articles', 0)}")
+                            st.markdown(f"**Prioridad:** {pillar.get('priority', 'N/A')}")
             
-            # Navegación
-            if 'navigation_recommendations' in arch:
-                st.divider()
-                st.subheader("🧭 Recomendaciones de Navegación")
-                
-                nav = arch['navigation_recommendations']
-                
-                if 'primary_nav' in nav:
-                    st.markdown("**Navegación Principal:**")
-                    st.markdown(", ".join(nav['primary_nav']))
-                
-                if 'secondary_nav' in nav:
-                    st.markdown("**Navegación Secundaria:**")
-                    st.info(nav['secondary_nav'])
-            
-            # Enlazado interno
-            if 'internal_linking' in arch:
-                st.divider()
-                st.subheader("🔗 Estrategia de Enlazado Interno")
-                
-                linking = arch['internal_linking']
-                
-                st.markdown(linking.get('strategy', 'No disponible'))
-                
-                if 'hub_pages' in linking:
-                    st.markdown("**Hub Pages recomendadas:**")
-                    for hub in linking['hub_pages']:
-                        st.markdown(f"- {hub}")
-            
-            # Prioridades de contenido
-            if 'content_priorities' in arch:
+            # Roadmap de implementación
+            if 'implementation_roadmap' in arch:
                 st.divider()
                 st.subheader("📅 Roadmap de Implementación")
                 
-                for phase in arch['content_priorities']:
-                    with st.expander(f"**{phase['phase']}**"):
-                        st.markdown("**Familias prioritarias:**")
-                        for fam in phase['families']:
-                            st.markdown(f"- {fam}")
-                        st.markdown(f"**Justificación:** {phase['rationale']}")
-            
-            # Oportunidades SEO
-            if 'seo_opportunities' in arch:
-                st.divider()
-                st.subheader("🎯 Oportunidades SEO Identificadas")
-                
-                for opp in arch['seo_opportunities'][:5]:
-                    with st.expander(f"💡 {opp['opportunity']} (Vol: {opp.get('potential_volume', 0):,})"):
-                        st.markdown(f"**Dificultad:** {opp.get('difficulty', 'N/A')}")
-                        st.markdown(f"**Recomendación:** {opp.get('recommendation', 'N/A')}")
-            
-            # Exportar mapa del sitio
-            st.divider()
-            
-            if st.button("📄 Generar Mapa del Sitio (Texto)"):
-                sitemap = arch_service.export_architecture_to_sitemap(arch)
-                
-                st.text_area("Mapa del Sitio", sitemap, height=400)
-                
-                st.download_button(
-                    "💾 Descargar Mapa del Sitio",
-                    data=sitemap,
-                    file_name=f"sitemap_architecture_{datetime.now().strftime('%Y%m%d')}.txt",
-                    mime="text/plain"
-                )
+                for phase in arch['implementation_roadmap']:
+                    with st.expander(f"**Fase {phase.get('phase', 0)}** - {phase.get('duration', 'N/A')}"):
+                        st.markdown(f"**Foco:** {phase.get('focus', 'N/A')}")
+                        st.markdown(f"**Páginas a crear:** {phase.get('pages_to_create', 0)}")
+                        st.markdown(f"**Esfuerzo estimado:** {phase.get('estimated_effort', 'N/A')}")
 
     # TAB 5: OPORTUNIDADES
     with tab5:
@@ -1928,25 +1724,25 @@ domain|another-site.com""",
                             # Resumen
                             summary_df = pd.DataFrame({
                                 'Sección': ['Resumen'],
-                                'Contenido': [st.session_state.architecture.get('summary', 'N/A')]
+                                'Contenido': [st.session_state.architecture.get('overview', 'N/A')]
                             })
                             summary_df.to_excel(writer, sheet_name='Resumen', index=False)
                             
-                            # Familias
-                            families_data = []
-                            for fam in st.session_state.architecture.get('families', []):
-                                families_data.append({
-                                    'Familia': fam['name'],
-                                    'Slug': fam.get('slug', ''),
-                                    'Prioridad': fam.get('priority', ''),
-                                    'Keywords': fam.get('keyword_count', 0),
-                                    'Volumen': fam.get('total_volume', 0),
-                                    'Tier': fam.get('tier', '')
-                                })
-                            
-                            if families_data:
-                                families_df = pd.DataFrame(families_data)
-                                families_df.to_excel(writer, sheet_name='Familias', index=False)
+                            # Estructura si existe
+                            if 'site_structure' in st.session_state.architecture:
+                                if 'main_sections' in st.session_state.architecture['site_structure']:
+                                    sections_data = []
+                                    for sec in st.session_state.architecture['site_structure']['main_sections']:
+                                        sections_data.append({
+                                            'Sección': sec.get('section_name', ''),
+                                            'URL': sec.get('url_structure', ''),
+                                            'Tipo': sec.get('page_type', ''),
+                                            'Prioridad': sec.get('priority', '')
+                                        })
+                                    
+                                    if sections_data:
+                                        sections_df = pd.DataFrame(sections_data)
+                                        sections_df.to_excel(writer, sheet_name='Estructura', index=False)
                         
                         output.seek(0)
                         st.download_button(
@@ -1957,9 +1753,7 @@ domain|another-site.com""",
                         )
                     else:  # Mapa del Sitio
                         arch_service = ArchitectureService()
-                        sitemap = arch_service.export_architecture_to_sitemap(
-                            st.session_state.architecture
-                        )
+                        sitemap = arch_service.export_to_document(st.session_state.architecture)
                         st.download_button(
                             "⬇️ Descargar Mapa del Sitio",
                             data=sitemap,
