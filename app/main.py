@@ -757,39 +757,198 @@ def main():
                             st.error(f"Error al leer el archivo: {str(e)}")
         
         with col2:
+            # Opción 2: Integración directa con Semrush
             st.subheader("Opción 2: Semrush API")
             
             if semrush_key:
-                competitor_domains = st.text_area(
-                    "Dominios competidores (uno por línea)",
-                    placeholder="example.com\ncompetitor.com",
-                    height=150
+                # Selector de tipo de análisis
+                analysis_mode = st.radio(
+                    "Tipo de análisis",
+                    ["🌐 Dominios", "🔗 URLs", "📁 Directorios", "📋 Mixto"],
+                    help="""
+                    - Dominios: Analiza un dominio completo (ej: example.com)
+                    - URLs: Analiza páginas específicas (ej: example.com/producto)
+                    - Directorios: Analiza secciones del sitio (ej: example.com/blog/)
+                    - Mixto: Combina dominios, URLs y directorios
+                    """
                 )
                 
-                if st.button("🔍 Obtener Keywords", type="primary"):
-                    if competitor_domains:
-                        domains = [d.strip() for d in competitor_domains.split('\n') if d.strip()]
+                # Inputs según el modo
+                if analysis_mode == "🌐 Dominios":
+                    targets_input = st.text_area(
+                        "Dominios (uno por línea)",
+                        placeholder="example.com\ncompetitor.com\nanother-site.com",
+                        height=150,
+                        help="Analiza dominios completos. Puedes incluir o no 'https://'"
+                    )
+                    target_type = 'domain'
+                    
+                elif analysis_mode == "🔗 URLs":
+                    targets_input = st.text_area(
+                        "URLs completas (una por línea)",
+                        placeholder="https://example.com/producto/nombre\nhttps://competitor.com/servicio/detalle\nhttps://example.com/blog/post",
+                        height=150,
+                        help="Analiza páginas específicas con sus keywords"
+                    )
+                    target_type = 'url'
+                    
+                elif analysis_mode == "📁 Directorios":
+                    targets_input = st.text_area(
+                        "Directorios (uno por línea)",
+                        placeholder="example.com/blog/\ncompetitor.com/productos/\nexample.com/recursos/",
+                        height=150,
+                        help="Analiza secciones completas del sitio (subdirectorios)"
+                    )
+                    target_type = 'directory'
+                    
+                else:  # Mixto
+                    st.info("💡 En modo mixto, especifica el tipo al lado de cada entrada")
+                    targets_input = st.text_area(
+                        "Targets (uno por línea, formato: tipo|valor)",
+                        placeholder="""domain|example.com
+                        url|https://competitor.com/producto
+                        directory|example.com/blog/
+                        domain|another-site.com""",
+                        height=180,
+                        help="Formato: domain|example.com, url|..., o directory|..."
+                    )
+                    target_type = 'mixed'
+                
+                # Opciones adicionales
+                col_opt1, col_opt2 = st.columns(2)
+                with col_opt1:
+                    semrush_limit = st.number_input(
+                        "Keywords por target",
+                        min_value=10,
+                        max_value=10000,
+                        value=500,
+                        step=50,
+                        help="Número máximo de keywords a extraer por cada dominio/URL/directorio"
+                    )
+                
+                with col_opt2:
+                    semrush_database = st.selectbox(
+                        "Base de datos",
+                        ["us", "uk", "es", "fr", "de", "it", "br", "mx", "ar"],
+                        help="País/región de la base de datos de Semrush"
+                    )
+                
+                filter_branded = st.checkbox(
+                    "Filtrar keywords de marca",
+                    value=True,
+                    help="Elimina keywords que contienen el nombre del dominio"
+                )
+                
+                # Botón de obtención
+                if st.button("🔍 Obtener Keywords de Semrush", type="primary", use_container_width=True):
+                    if targets_input:
+                        # Parsear targets
+                        targets_list = []
                         
-                        with st.spinner("Obteniendo datos de Semrush..."):
-                            semrush = SemrushService(semrush_key)
-                            all_data = []
-                            
-                            progress_bar = st.progress(0)
-                            for i, domain in enumerate(domains):
+                        if target_type == 'mixed':
+                            # Modo mixto: parsear cada línea
+                            for line in targets_input.split('\n'):
+                                line = line.strip()
+                                if '|' in line:
+                                    tipo, valor = line.split('|', 1)
+                                    tipo = tipo.strip().lower()
+                                    valor = valor.strip()
+                                    
+                                    if tipo in ['domain', 'url', 'directory'] and valor:
+                                        targets_list.append({
+                                            'target': valor,
+                                            'type': tipo
+                                        })
+                        else:
+                            # Modo simple: todos son del mismo tipo
+                            for line in targets_input.split('\n'):
+                                line = line.strip()
+                                if line:
+                                    targets_list.append({
+                                        'target': line,
+                                        'type': target_type
+                                    })
+                        
+                        if not targets_list:
+                            st.error("❌ No se encontraron targets válidos")
+                        else:
+                            with st.spinner(f"🔄 Obteniendo datos de Semrush ({len(targets_list)} targets)..."):
                                 try:
-                                    data = semrush.get_organic_keywords(domain, limit=max_keywords)
-                                    all_data.append(data)
-                                    st.success(f"✅ {domain}: {len(data)} keywords")
+                                    semrush = SemrushService(semrush_key)
+                                    
+                                    # Usar batch_get_keywords para múltiples targets
+                                    all_data = semrush.batch_get_keywords(
+                                        targets=targets_list,
+                                        limit=semrush_limit,
+                                        delay=1.0,
+                                        database=semrush_database
+                                    )
+                                    
+                                    if len(all_data) > 0:
+                                        # Filtrar branded si se solicita
+                                        if filter_branded:
+                                            initial_count = len(all_data)
+                                            # Ya se filtró en el servicio, pero por si acaso
+                                            all_data = all_data.copy()
+                                            filtered_count = len(all_data)
+                                            if initial_count > filtered_count:
+                                                st.info(f"🔍 Filtradas {initial_count - filtered_count} keywords de marca")
+                                        
+                                        # Guardar en session state
+                                        st.session_state.processed_data = all_data
+                                        
+                                        # Mostrar resumen
+                                        st.success(f"✅ {len(all_data)} keywords obtenidas exitosamente")
+                                        
+                                        # Resumen por tipo/source
+                                        col_sum1, col_sum2, col_sum3 = st.columns(3)
+                                        
+                                        with col_sum1:
+                                            st.metric("Keywords Únicas", all_data['keyword'].nunique())
+                                        
+                                        with col_sum2:
+                                            st.metric("Volumen Total", f"{all_data['volume'].sum():,.0f}")
+                                        
+                                        with col_sum3:
+                                            st.metric("Tráfico Total", f"{all_data['traffic'].sum():,.0f}")
+                                        
+                                        # Mostrar distribución por source
+                                        if 'source' in all_data.columns:
+                                            with st.expander("📊 Distribución por Source"):
+                                                source_summary = all_data.groupby(['source', 'source_type']).agg({
+                                                    'keyword': 'count',
+                                                    'volume': 'sum',
+                                                    'traffic': 'sum'
+                                                }).reset_index()
+                                                source_summary.columns = ['Source', 'Tipo', 'Keywords', 'Volumen', 'Tráfico']
+                                                st.dataframe(source_summary, use_container_width=True)
+                                        
+                                        # Preview de datos
+                                        with st.expander("👁️ Preview de los datos"):
+                                            st.dataframe(
+                                                all_data[['keyword', 'volume', 'traffic', 'position', 'url', 'source_type', 'source']].head(20),
+                                                use_container_width=True
+                                            )
+                                    else:
+                                        st.warning("⚠️ No se obtuvieron keywords. Verifica los targets.")
+                                        
                                 except Exception as e:
-                                    st.error(f"❌ Error con {domain}: {str(e)}")
-                                
-                                progress_bar.progress((i + 1) / len(domains))
-                            
-                            if all_data:
-                                st.session_state.processed_data = pd.concat(all_data, ignore_index=True)
-                                st.success(f"🎉 Total: {len(st.session_state.processed_data)} keywords obtenidas")
+                                    st.error(f"❌ Error al obtener datos de Semrush: {str(e)}")
+                                    with st.expander("🔍 Ver detalles del error"):
+                                        import traceback
+                                        st.code(traceback.format_exc())
+                    else:
+                        st.warning("⚠️ Por favor ingresa al menos un target")
             else:
-                st.warning("⚠️ Ingresa tu API key de Semrush")
+                st.warning("⚠️ Ingresa tu API key de Semrush en la barra lateral")
+                st.info("""
+                **¿Cómo obtener tu API key de Semrush?**
+                
+                1. Inicia sesión en [Semrush](https://www.semrush.com/)
+                2. Ve a Configuración → API
+                3. Copia tu API key
+                4. Pégala en la barra lateral
+                """)
     
     # TAB 2: Análisis con IA
     with tab2:
