@@ -229,6 +229,54 @@ if 'uploaded_files' not in st.session_state:
 if 'processed_data' not in st.session_state:
     st.session_state.processed_data = None
 
+# Inicializar session state para multi-análisis
+if 'multi_analyses' not in st.session_state:
+    st.session_state.multi_analyses = {
+        'Temática (Topics)': None,
+        'Intención de búsqueda': None,
+        'Funnel de conversión': None
+    }
+
+if 'current_dataset_hash' not in st.session_state:
+    st.session_state.current_dataset_hash = None
+
+if 'project_metadata' not in st.session_state:
+    st.session_state.project_metadata = {
+        'project_name': f"Proyecto {datetime.now().strftime('%Y-%m-%d')}",
+        'total_keywords': 0,
+        'total_volume': 0
+    }
+
+
+def get_analysis_progress():
+    """Retorna el progreso de análisis completados"""
+    completed = sum(1 for v in st.session_state.multi_analyses.values() if v is not None)
+    total = len(st.session_state.multi_analyses)
+    return completed, total
+
+
+def save_analysis_to_multi(analysis_type: str, result: Dict, df):
+    """Guarda un análisis en el tracker multi-análisis"""
+    st.session_state.multi_analyses[analysis_type] = result
+    
+    # Actualizar metadata del proyecto
+    if df is not None:
+        from app.utils.cache_manager import CacheManager
+        cache_manager = CacheManager()
+        st.session_state.current_dataset_hash = cache_manager.get_data_hash(df)
+        st.session_state.project_metadata['total_keywords'] = len(df)
+        st.session_state.project_metadata['total_volume'] = int(df['volume'].sum())
+
+
+def reset_multi_analyses():
+    """Resetea todos los análisis (nuevo dataset)"""
+    st.session_state.multi_analyses = {
+        'Temática (Topics)': None,
+        'Intención de búsqueda': None,
+        'Funnel de conversión': None
+    }
+    st.session_state.current_dataset_hash = None
+
 def display_logo():
     """Muestra el logo con sistema de fallback en cascada"""
     if LOGO_URL:
