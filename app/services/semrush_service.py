@@ -178,7 +178,7 @@ class SemrushServiceOptimized:
     def get_organic_keywords(
         self, 
         domain: str, 
-        limit: int = 5000,  # Aumentado de 1000
+        limit: int = 5000,
         database: str = "us",
         filter_branded: bool = True,
         force_refresh: bool = False
@@ -486,6 +486,44 @@ class SemrushServiceOptimized:
         
         return result
     
+    def get_keyword_overview(self, keyword: str, database: str = "us") -> Dict:
+        """Obtiene información detallada de una keyword"""
+        
+        self.rate_limiter.wait_if_needed()
+        
+        try:
+            params = {
+                'type': 'phrase_this',
+                'phrase': keyword,
+                'database': database,
+                'export_columns': 'Ph,Nq,Cp,Co,Nr,Td'
+            }
+            
+            response = self.session.get(self.BASE_URL, params=params, timeout=30)
+            response.raise_for_status()
+            
+            lines = response.text.strip().split('\n')
+            if len(lines) < 2:
+                return {}
+            
+            header = lines[0].split(';')
+            data = lines[1].split(';')
+            
+            info = dict(zip(header, data))
+            
+            return {
+                'keyword': info.get('Keyword', keyword),
+                'volume': int(info.get('Search Volume', 0)),
+                'cpc': float(info.get('CPC', 0)),
+                'competition': float(info.get('Competition', 0)),
+                'results': int(info.get('Number of Results', 0)),
+                'trends': info.get('Trends', '')
+            }
+            
+        except Exception as e:
+            logger.error(f"Error obteniendo info de keyword '{keyword}': {str(e)}")
+            return {}
+    
     def get_competitors(
         self, 
         domain: str, 
@@ -635,7 +673,7 @@ if __name__ == "__main__":
     # Ejemplo 1: Keywords de un dominio (con caché)
     keywords = semrush.get_organic_keywords(
         domain="ahrefs.com",
-        limit=5000  # Hasta 10,000
+        limit=5000
     )
     print(f"Obtenidas {len(keywords)} keywords de ahrefs.com")
     
@@ -647,7 +685,7 @@ if __name__ == "__main__":
     )
     print(f"Total keywords (secuencial): {len(all_keywords)}")
     
-    # Ejemplo 3: Batch paralelo de múltiples dominios (más rápido)
+    # Ejemplo 3: Batch paralelo (más rápido)
     all_keywords_parallel = semrush.batch_get_keywords_parallel(
         domains=domains,
         limit=3000,
