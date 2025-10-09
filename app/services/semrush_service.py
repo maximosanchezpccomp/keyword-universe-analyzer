@@ -307,6 +307,58 @@ class SemrushServiceOptimized:
         
         return df
     
+    def batch_get_keywords(
+        self, 
+        domains: List[str], 
+        limit: int = 5000,
+        delay: float = 1.0
+    ) -> pd.DataFrame:
+        """
+        Obtiene keywords de múltiples dominios (versión secuencial compatible)
+        
+        Este método mantiene compatibilidad con código existente pero usa
+        internamente las optimizaciones del servicio (caché, rate limiting, etc)
+        
+        Args:
+            domains: Lista de dominios
+            limit: Keywords por dominio
+            delay: Delay entre requests (ignorado, usamos rate limiter interno)
+        
+        Returns:
+            DataFrame con todas las keywords combinadas y deduplicadas
+        """
+        all_keywords = []
+        failed_domains = []
+        
+        for domain in domains:
+            try:
+                logger.info(f"🔍 Obteniendo keywords de {domain}...")
+                keywords = self.get_organic_keywords(domain, limit=limit)
+                all_keywords.append(keywords)
+                logger.info(f"✓ {domain}: {len(keywords)} keywords")
+                
+            except Exception as e:
+                logger.error(f"✗ Error con {domain}: {str(e)}")
+                failed_domains.append(domain)
+                continue
+        
+        if failed_domains:
+            logger.warning(f"⚠️ Dominios fallidos: {', '.join(failed_domains)}")
+        
+        if not all_keywords:
+            raise ValueError("No se pudieron obtener keywords de ningún dominio")
+        
+        # Combinar todos los DataFrames
+        combined = pd.concat(all_keywords, ignore_index=True)
+        
+        # Deduplicar keywords manteniendo la de mayor volumen
+        combined = combined.sort_values('volume', ascending=False)
+        combined = combined.drop_duplicates(subset=['keyword'], keep='first')
+        
+        logger.info(f"✅ Total: {len(combined)} keywords únicas de {len(domains)} dominios")
+        
+        return combined
+    
     def batch_get_keywords_parallel(
         self, 
         domains: List[str], 
@@ -362,6 +414,46 @@ class SemrushServiceOptimized:
         
         return combined
     
+    def get_domain_overview(self, domain: str, database: str = "us") -> Dict:
+        """Obtiene overview del dominio (versión simple sin caché)"""
+        
+        self.rate_limiter.wait_if_needed()
+        
+        params = {
+            'type': 'domain_ranks',
+            'domain': domain,
+            'database': database,
+            'export_columns': 'Dn,Rk,Or,Ot,Oc,Ad,At,Ac'
+        }
+        
+        try:
+            response = self.session.get(self.BASE_URL, params=params, timeout=30)
+            response.raise_for_status()
+            
+            lines = response.text.strip().split('\n')
+            if len(lines) < 2:
+                return {}
+            
+            header = lines[0].split(';')
+            data = lines[1].split(';')
+            overview = dict(zip(header, data))
+            
+            result = {
+                'domain': overview.get('Domain', domain),
+                'rank': int(overview.get('Rank', 0)),
+                'organic_keywords': int(overview.get('Organic Keywords', 0)),
+                'organic_traffic': int(overview.get('Organic Traffic', 0)),
+                'organic_cost': float(overview.get('Organic Cost', 0)),
+            }
+            
+            self.stats['requests_made'] += 1
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error obteniendo overview de {domain}: {str(e)}")
+            return {}
+    
     def get_domain_overview_cached(
         self, 
         domain: str, 
@@ -381,44 +473,78 @@ class SemrushServiceOptimized:
                         return json.load(f)
         
         # Obtener fresh data
-        self.rate_limiter.wait_if_needed()
+        result = self.get_domain_overview(domain, database)
         
-        params = {
-            'type': 'domain_ranks',
-            'domain': domain,
-            'database': database,
-            'export_columns': 'Dn,Rk,Or,Ot,Oc,Ad,At,Ac'
-        }
-        
-        response = self.session.get(self.BASE_URL, params=params, timeout=30)
-        response.raise_for_status()
-        
-        lines = response.text.strip().split('\n')
-        if len(lines) < 2:
-            return {}
-        
-        header = lines[0].split(';')
-        data = lines[1].split(';')
-        overview = dict(zip(header, data))
-        
-        result = {
-            'domain': overview.get('Domain', domain),
-            'rank': int(overview.get('Rank', 0)),
-            'organic_keywords': int(overview.get('Organic Keywords', 0)),
-            'organic_traffic': int(overview.get('Organic Traffic', 0)),
-            'organic_cost': float(overview.get('Organic Cost', 0)),
-            'fetched_at': datetime.now().isoformat()
-        }
-        
-        # Guardar en caché
-        if self.cache:
-            cache_file = self.cache.cache_dir / f"{cache_key}.json"
-            with open(cache_file, 'w') as f:
-                json.dump(result, f)
-        
-        self.stats['requests_made'] += 1
+        if result:
+            result['fetched_at'] = datetime.now().isoformat()
+            
+            # Guardar en caché
+            if self.cache:
+                cache_file = self.cache.cache_dir / f"{cache_key}.json"
+                with open(cache_file, 'w') as f:
+                    json.dump(result, f)
         
         return result
+    
+    def get_competitors(
+        self, 
+        domain: str, 
+        database: str = "us",
+        limit: int = 10
+    ) -> pd.DataFrame:
+        """Obtiene competidores orgánicos del dominio"""
+        
+        self.rate_limiter.wait_if_needed()
+        
+        try:
+            params = {
+                'type': 'domain_organic_organic',
+                'domain': domain,
+                'database': database,
+                'display_limit': limit,
+                'export_columns': 'Dn,Cr,Np,Or,Ot,Oc,Ad'
+            }
+            
+            response = self.session.get(self.BASE_URL, params=params, timeout=30)
+            response.raise_for_status()
+            
+            lines = response.text.strip().split('\n')
+            if len(lines) < 2:
+                return pd.DataFrame()
+            
+            header = lines[0].split(';')
+            data = [line.split(';') for line in lines[1:]]
+            
+            df = pd.DataFrame(data, columns=header)
+            
+            # Renombrar columnas
+            column_mapping = {
+                'Domain': 'competitor',
+                'Competition Relevance': 'relevance',
+                'Common Keywords': 'common_keywords',
+                'Organic Keywords': 'organic_keywords',
+                'Organic Traffic': 'organic_traffic',
+                'Organic Cost': 'organic_cost',
+                'Adwords Keywords': 'adwords_keywords'
+            }
+            
+            df = df.rename(columns=column_mapping)
+            
+            # Convertir tipos
+            numeric_cols = ['relevance', 'common_keywords', 'organic_keywords', 
+                          'organic_traffic', 'organic_cost', 'adwords_keywords']
+            
+            for col in numeric_cols:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            
+            self.stats['requests_made'] += 1
+            
+            return df
+            
+        except Exception as e:
+            logger.error(f"Error obteniendo competidores de {domain}: {str(e)}")
+            return pd.DataFrame()
     
     def _estimate_credits(self, keywords_count: int) -> int:
         """Estima créditos usados (Semrush cobra por 10 rows)"""
@@ -489,6 +615,10 @@ class SemrushServiceOptimized:
             return [o['domain'] for o in overviews], keywords_per_domain
 
 
+# Alias para mantener compatibilidad con código existente
+SemrushService = SemrushServiceOptimized
+
+
 # Ejemplo de uso
 if __name__ == "__main__":
     # Configurar logging
@@ -509,16 +639,23 @@ if __name__ == "__main__":
     )
     print(f"Obtenidas {len(keywords)} keywords de ahrefs.com")
     
-    # Ejemplo 2: Batch paralelo de múltiples dominios
+    # Ejemplo 2: Batch secuencial (compatible)
     domains = ["ahrefs.com", "semrush.com", "moz.com"]
-    all_keywords = semrush.batch_get_keywords_parallel(
+    all_keywords = semrush.batch_get_keywords(
+        domains=domains,
+        limit=3000
+    )
+    print(f"Total keywords (secuencial): {len(all_keywords)}")
+    
+    # Ejemplo 3: Batch paralelo de múltiples dominios (más rápido)
+    all_keywords_parallel = semrush.batch_get_keywords_parallel(
         domains=domains,
         limit=3000,
         max_workers=3
     )
-    print(f"Total keywords de {len(domains)} dominios: {len(all_keywords)}")
+    print(f"Total keywords (paralelo): {len(all_keywords_parallel)}")
     
-    # Ejemplo 3: Ver estadísticas
+    # Ejemplo 4: Ver estadísticas
     stats = semrush.get_stats()
     print("\nEstadísticas de uso:")
     print(f"Requests hechos: {stats['requests_made']}")
