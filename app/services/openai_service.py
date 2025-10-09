@@ -1,20 +1,33 @@
 """
-Parche para app/services/openai_service.py
-Añade mejor manejo de errores y validación de respuestas
+Servicio para integración con OpenAI API con sistema de caché
 """
 
 from openai import OpenAI
 import pandas as pd
 import json
 from typing import Dict, List, Any
+import logging
+
+# Importar cache manager
+from app.utils.cache_manager import get_cache_manager
+from config import CACHE_CONFIG, estimate_analysis_cost
+
+logger = logging.getLogger(__name__)
+
 
 class OpenAIService:
-    """Servicio para interactuar con la API de OpenAI"""
+    """Servicio para interactuar con la API de OpenAI con caché inteligente"""
     
     def __init__(self, api_key: str, model: str = "gpt-4o"):
         self.client = OpenAI(api_key=api_key)
         self.model = model
         self.max_tokens = 16000 if model in ["gpt-4o", "gpt-4-turbo"] else 4096
+        
+        # Cache manager
+        self.cache_manager = get_cache_manager()
+        self.cache_enabled = CACHE_CONFIG.get('enabled', True)
+        
+        logger.info(f"OpenAIService inicializado - Modelo: {model}, Caché: {self.cache_enabled}")
     
     def create_universe_prompt(
         self,
@@ -152,10 +165,54 @@ Asigna tiers considerando el valor estratégico de cada etapa."""
         
         return instructions.get(analysis_type, instructions["Temática (Topics)"])
     
-    def analyze_keywords(self, messages: List[Dict[str, str]], df: pd.DataFrame) -> Dict[str, Any]:
-        """Envía el prompt a OpenAI y procesa la respuesta"""
+    def analyze_keywords(
+        self,
+        messages: List[Dict[str, str]],
+        df: pd.DataFrame,
+        use_cache: bool = True,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Envía el prompt a OpenAI y procesa la respuesta con sistema de caché
+        
+        Args:
+            messages: Mensajes en formato chat
+            df: DataFrame con keywords
+            use_cache: Si usar el sistema de caché
+            **kwargs: Parámetros adicionales del análisis
+        """
+        
+        # Generar hash para caché
+        cache_hash = None
+        if self.cache_enabled and use_cache:
+            cache_hash = self.cache_manager.generate_hash(
+                df=df,
+                analysis_type=kwargs.get('analysis_type', 'Temática (Topics)'),
+                num_tiers=kwargs.get('num_tiers', 3),
+                custom_instructions=kwargs.get('custom_instructions', ''),
+                include_semantic=kwargs.get('include_semantic', True),
+                include_trends=kwargs.get('include_trends', True),
+                include_gaps=kwargs.get('include_gaps', True)
+            )
+            
+            logger.info(f"Cache hash generado: {cache_hash}")
+            
+            # Intentar recuperar del caché
+            ttl_hours = CACHE_CONFIG.get('default_ttl_hours', 24)
+            cached_result = self.cache_manager.get_cached_analysis(cache_hash, ttl_hours)
+            
+            if cached_result is not None:
+                logger.info(f"✅ Resultado recuperado del caché (ahorro de ${cached_result.get('_cache_metadata', {}).get('cost', 0)})")
+                return cached_result
+            
+            logger.info("❌ Cache miss - Realizando análisis nuevo")
+        
+        # Estimar costo
+        cost_estimate = estimate_analysis_cost(self.model, len(df))
+        logger.info(f"Costo estimado: ${cost_estimate['cost']}")
         
         try:
+            # Llamada real a la API
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
@@ -164,79 +221,51 @@ Asigna tiers considerando el valor estratégico de cada etapa."""
                 response_format={"type": "json_object"}
             )
             
-            # VALIDACIÓN: Verificar que la respuesta existe
-            if not response or not response.choices:
-                raise ValueError("OpenAI no devolvió ninguna respuesta. Verifica tu API key y límites de uso.")
-            
-            # VALIDACIÓN: Verificar que hay contenido
+            # Extraer contenido
             response_text = response.choices[0].message.content
-            
-            if response_text is None or response_text.strip() == "":
-                # Log adicional para debugging
-                finish_reason = response.choices[0].finish_reason if response.choices else "unknown"
-                raise ValueError(
-                    f"OpenAI devolvió una respuesta vacía. "
-                    f"Finish reason: {finish_reason}. "
-                    f"Esto puede deberse a: (1) Filtro de contenido, (2) API key inválida, "
-                    f"(3) Límite de tokens excedido, o (4) Error del modelo."
-                )
             
             # Parsear JSON
             try:
                 result = json.loads(response_text)
-            except json.JSONDecodeError as json_error:
+            except json.JSONDecodeError:
                 # Intentar extraer JSON del texto
                 import re
                 json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
                 if json_match:
-                    try:
-                        result = json.loads(json_match.group())
-                    except json.JSONDecodeError:
-                        raise ValueError(
-                            f"No se pudo parsear el JSON de OpenAI. "
-                            f"Respuesta recibida (primeros 500 chars): {response_text[:500]}"
-                        ) from json_error
+                    result = json.loads(json_match.group())
                 else:
-                    raise ValueError(
-                        f"No se encontró JSON válido en la respuesta de OpenAI. "
-                        f"Respuesta recibida: {response_text[:500]}"
-                    ) from json_error
-            
-            # VALIDACIÓN: Verificar que el resultado tiene la estructura esperada
-            if not isinstance(result, dict):
-                raise ValueError(f"La respuesta de OpenAI no es un diccionario JSON válido: {type(result)}")
-            
-            if 'topics' not in result:
-                raise ValueError(
-                    f"La respuesta de OpenAI no contiene el campo 'topics'. "
-                    f"Campos disponibles: {list(result.keys())}"
-                )
+                    raise ValueError("No se pudo extraer JSON válido de la respuesta")
             
             # Enriquecer resultados
             result = self._enrich_results(result, df)
             
+            # Guardar en caché si está habilitado
+            if self.cache_enabled and use_cache and cache_hash:
+                saved = self.cache_manager.save_analysis(
+                    cache_hash=cache_hash,
+                    result=result,
+                    provider='OpenAI',
+                    model=self.model,
+                    estimated_cost=cost_estimate['cost'],
+                    estimated_credits=cost_estimate['input_tokens'] + cost_estimate['output_tokens'],
+                    parameters=kwargs
+                )
+                
+                if saved:
+                    logger.info(f"💾 Análisis guardado en caché: {cache_hash}")
+            
             return result
             
         except Exception as e:
-            # Proporcionar contexto adicional sobre el error
-            error_message = f"Error al analizar con OpenAI: {str(e)}"
-            
-            # Si es un error de la API de OpenAI, dar más detalles
-            if "API" in str(e) or "authentication" in str(e).lower():
-                error_message += "\n\n💡 Sugerencia: Verifica que tu API key de OpenAI sea válida y tenga créditos disponibles."
-            elif "rate" in str(e).lower() or "limit" in str(e).lower():
-                error_message += "\n\n💡 Sugerencia: Has excedido el límite de solicitudes. Espera unos minutos e intenta de nuevo."
-            elif "timeout" in str(e).lower():
-                error_message += "\n\n💡 Sugerencia: La solicitud tardó demasiado. Intenta con menos keywords o vuelve a intentar."
-            
-            raise Exception(error_message)
+            logger.error(f"Error al analizar con OpenAI: {str(e)}")
+            raise Exception(f"Error al analizar con OpenAI: {str(e)}")
     
     def _enrich_results(self, result: Dict, df: pd.DataFrame) -> Dict:
         """Enriquece los resultados con datos adicionales"""
         
         if 'topics' in result:
             for topic in result['topics']:
-                # Asegurar que todos los campos numéricos sean int/float
+                # Asegurar tipos correctos
                 topic['keyword_count'] = int(topic.get('keyword_count', 0))
                 topic['volume'] = int(topic.get('volume', 0))
                 topic['traffic'] = int(topic.get('traffic', 0))
@@ -301,19 +330,10 @@ Responde en JSON:
                 response_format={"type": "json_object"}
             )
             
-            # Validar respuesta
-            if not response or not response.choices or not response.choices[0].message.content:
-                return {
-                    "validation": "No se pudo completar la validación cruzada: respuesta vacía",
-                    "missing_topics": [],
-                    "improvements": [],
-                    "error": "Empty response from OpenAI"
-                }
-            
             return json.loads(response.choices[0].message.content)
             
         except Exception as e:
-            print(f"Error en comparación: {str(e)}")
+            logger.error(f"Error en comparación: {str(e)}")
             return {
                 "validation": "No se pudo completar la validación cruzada",
                 "missing_topics": [],
@@ -354,15 +374,11 @@ Dataset:
                 response_format={"type": "json_object"}
             )
             
-            if not response or not response.choices or not response.choices[0].message.content:
-                print("OpenAI devolvió respuesta vacía para topic details")
-                return pd.DataFrame()
-            
             result = json.loads(response.choices[0].message.content)
             matching_keywords = result.get('keywords', [])
             
             return df[df['keyword'].isin(matching_keywords)]
             
         except Exception as e:
-            print(f"Error obteniendo detalles del topic: {str(e)}")
+            logger.error(f"Error obteniendo detalles del topic: {str(e)}")
             return pd.DataFrame()
