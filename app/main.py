@@ -10,7 +10,6 @@ from pathlib import Path
 from io import BytesIO
 import openpyxl
 
-
 # Añadir el directorio raíz al path
 sys.path.append(str(Path(__file__).parent.parent))
 
@@ -40,7 +39,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS personalizado con branding PC Componentes - OPTIMIZADO PARA USABILIDAD
+# CSS personalizado con branding PC Componentes
 st.markdown("""
 <style>
     /* Colores corporativos PC Componentes */
@@ -236,24 +235,18 @@ if 'uploaded_files' not in st.session_state:
     st.session_state.uploaded_files = []
 if 'processed_data' not in st.session_state:
     st.session_state.processed_data = None
-
-# NUEVO: Session state para arquitectura web
 if 'architecture' not in st.session_state:
     st.session_state.architecture = None
 if 'analyses_history' not in st.session_state:
     st.session_state.analyses_history = []
-
-# Inicializar session state para multi-análisis
 if 'multi_analyses' not in st.session_state:
     st.session_state.multi_analyses = {
         'Temática (Topics)': None,
         'Intención de búsqueda': None,
         'Funnel de conversión': None
     }
-
 if 'current_dataset_hash' not in st.session_state:
     st.session_state.current_dataset_hash = None
-
 if 'project_metadata' not in st.session_state:
     st.session_state.project_metadata = {
         'project_name': f"Proyecto {datetime.now().strftime('%Y-%m-%d')}",
@@ -273,9 +266,7 @@ def save_analysis_to_multi(analysis_type: str, result: Dict, df):
     """Guarda un análisis en el tracker multi-análisis"""
     st.session_state.multi_analyses[analysis_type] = result
     
-    # Actualizar metadata del proyecto
     if df is not None:
-        from app.utils.cache_manager import CacheManager
         cache_manager = CacheManager()
         st.session_state.current_dataset_hash = cache_manager.get_data_hash(df)
         st.session_state.project_metadata['total_keywords'] = len(df)
@@ -290,6 +281,7 @@ def reset_multi_analyses():
         'Funnel de conversión': None
     }
     st.session_state.current_dataset_hash = None
+
 
 def display_logo():
     """Muestra el logo con sistema de fallback en cascada"""
@@ -384,7 +376,7 @@ def main():
                 model_choice = st.selectbox("Modelo Claude", 
                                            ["claude-sonnet-4-5-20250929", 
                                             "claude-opus-4-20250514"])
-                claude_model = model_choice  # Asignar también a claude_model
+                claude_model = model_choice
                 
             elif ai_provider == "OpenAI":
                 model_choice = st.selectbox("Modelo OpenAI",
@@ -392,7 +384,7 @@ def main():
                                             "gpt-4-turbo",
                                             "gpt-4",
                                             "gpt-3.5-turbo"])
-                openai_model = model_choice  # Asignar también a openai_model
+                openai_model = model_choice
                 
             else:  # Ambos
                 col1, col2 = st.columns(2)
@@ -404,113 +396,94 @@ def main():
                     openai_model = st.selectbox("Modelo OpenAI",
                                                ["gpt-4o",
                                                 "gpt-4-turbo"])
-                # model_choice no se usa en modo "Ambos", pero definirlo para evitar errores
                 model_choice = claude_model
-
-    # Gestión de Caché
-    with st.expander("💾 Sistema de Caché", expanded=False):
-        st.markdown("**Sistema de caché inteligente**")
-        st.markdown("Ahorra costos reutilizando análisis previos")
         
-        # Obtener cache manager
-        cache_manager = get_cache_manager()
-        
-        # Toggle para habilitar/deshabilitar
-        cache_enabled = st.checkbox(
-            "Habilitar caché",
-            value=CACHE_CONFIG.get('enabled', True),
-            help="Reutiliza análisis previos para ahorrar costos"
-        )
-        
-        # TTL configurable
-        ttl_hours = st.slider(
-            "Validez del caché (horas)",
-            min_value=1,
-            max_value=168,  # 1 semana
-            value=CACHE_CONFIG.get('default_ttl_hours', 24),
-            help="Tiempo que permanece válido un análisis en caché"
-        )
-        
-        st.divider()
-        
-        # Estadísticas del caché
-        cache_info = cache_manager.get_cache_info()
-        
-        st.markdown("**📊 Estadísticas**")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric(
-                "Análisis en caché",
-                f"{cache_info['cached_analyses']}"
+        # Gestión de Caché
+        with st.expander("💾 Sistema de Caché", expanded=False):
+            st.markdown("**Sistema de caché inteligente**")
+            st.markdown("Ahorra costos reutilizando análisis previos")
+            
+            cache_manager = get_cache_manager()
+            
+            cache_enabled = st.checkbox(
+                "Habilitar caché",
+                value=CACHE_CONFIG.get('enabled', True),
+                help="Reutiliza análisis previos para ahorrar costos"
             )
-            st.metric(
-                "Hit rate",
-                f"{cache_info['hit_rate']:.1f}%",
-                help="% de análisis recuperados del caché"
+            
+            ttl_hours = st.slider(
+                "Validez del caché (horas)",
+                min_value=1,
+                max_value=168,
+                value=CACHE_CONFIG.get('default_ttl_hours', 24),
+                help="Tiempo que permanece válido un análisis en caché"
             )
-        
-        with col2:
-            st.metric(
-                "$ Ahorrado",
-                f"${cache_info['cost_saved']:.2f}",
-                help="Costos ahorrados usando caché"
-            )
-            st.metric(
-                "Tamaño",
-                f"{cache_info['size_mb']} MB"
-            )
-        
-        st.divider()
-        
-        # Acciones de gestión
-        st.markdown("**🔧 Gestión**")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.button("🗑️ Limpiar caché antiguo", help="Elimina análisis con más de 7 días"):
-                deleted = cache_manager.clear_cache(older_than_hours=168)
-                st.success(f"✅ {deleted} análisis eliminados")
-                st.rerun()
-        
-        with col2:
-            if st.button("⚠️ Limpiar todo", help="Elimina TODO el caché"):
-                if st.session_state.get('confirm_clear_all', False):
-                    deleted = cache_manager.clear_cache()
+            
+            st.divider()
+            
+            # Estadísticas del caché
+            cache_info = cache_manager.get_cache_info()
+            
+            st.markdown("**📊 Estadísticas**")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Análisis en caché", f"{cache_info['cached_analyses']}")
+                st.metric("Hit rate", f"{cache_info['hit_rate']:.1f}%",
+                         help="% de análisis recuperados del caché")
+            
+            with col2:
+                st.metric("$ Ahorrado", f"${cache_info['cost_saved']:.2f}",
+                         help="Costos ahorrados usando caché")
+                st.metric("Tamaño", f"{cache_info['size_mb']} MB")
+            
+            st.divider()
+            
+            # Acciones de gestión
+            st.markdown("**🔧 Gestión**")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("🗑️ Limpiar caché antiguo", help="Elimina análisis con más de 7 días"):
+                    deleted = cache_manager.clear_cache(older_than_hours=168)
                     st.success(f"✅ {deleted} análisis eliminados")
-                    st.session_state.confirm_clear_all = False
                     st.rerun()
+            
+            with col2:
+                if st.button("⚠️ Limpiar todo", help="Elimina TODO el caché"):
+                    if st.session_state.get('confirm_clear_all', False):
+                        deleted = cache_manager.clear_cache()
+                        st.success(f"✅ {deleted} análisis eliminados")
+                        st.session_state.confirm_clear_all = False
+                        st.rerun()
+                    else:
+                        st.session_state.confirm_clear_all = True
+                        st.warning("⚠️ Haz clic de nuevo para confirmar")
+            
+            # Listado de análisis recientes
+            with st.expander("📋 Análisis en caché (últimos 10)"):
+                recent_analyses = cache_manager.list_cached_analyses(limit=10)
+                
+                if recent_analyses:
+                    for analysis in recent_analyses:
+                        age_text = f"{analysis['age_hours']:.1f}h" if analysis['age_hours'] < 24 else f"{analysis['age_hours']/24:.1f}d"
+                        
+                        st.text(f"""
+{analysis['provider']} ({analysis['model']})
+Antigüedad: {age_text} | Costo: ${analysis['cost']:.3f}
+Parámetros: {analysis['parameters'].get('analysis_type', 'N/A')} | Tiers: {analysis['parameters'].get('num_tiers', 'N/A')}
+                        """)
+                        st.caption(f"Hash: {analysis['hash'][:16]}...")
+                        st.divider()
                 else:
-                    st.session_state.confirm_clear_all = True
-                    st.warning("⚠️ Haz clic de nuevo para confirmar")
+                    st.info("No hay análisis en caché todavía")
         
-        # Listado de análisis recientes
-        with st.expander("📋 Análisis en caché (últimos 10)"):
-            recent_analyses = cache_manager.list_cached_analyses(limit=10)
-            
-            if recent_analyses:
-                for analysis in recent_analyses:
-                    age_text = f"{analysis['age_hours']:.1f}h" if analysis['age_hours'] < 24 else f"{analysis['age_hours']/24:.1f}d"
-                    
-                    st.text(f"""
-                    {analysis['provider']} ({analysis['model']})
-                    Antigüedad: {age_text} | Costo: ${analysis['cost']:.3f}
-                    Parámetros: {analysis['parameters'].get('analysis_type', 'N/A')} | Tiers: {analysis['parameters'].get('num_tiers', 'N/A')}
-                    """)
-                    st.caption(f"Hash: {analysis['hash'][:16]}...")
-                    st.divider()
-            else:
-                st.info("No hay análisis en caché todavía")
-        
-        # Sistema de Caché
+        # Análisis Guardados
         with st.expander("💾 Análisis Guardados", expanded=False):
-            st.markdown("### Gestión de Caché")
+            st.markdown("### Gestión de Análisis")
             
-            # Inicializar cache manager
             cache_manager = CacheManager()
-            
-            # Estadísticas de caché
             cache_stats = cache_manager.get_cache_size()
             
             col_cache1, col_cache2 = st.columns(2)
@@ -519,25 +492,21 @@ def main():
             with col_cache2:
                 st.metric("Tamaño", f"{cache_stats['total_size_mb']} MB")
             
-            # Listar análisis guardados
             analyses = cache_manager.list_analyses()
             
             if analyses:
                 st.markdown("#### Cargar Análisis Anterior")
                 
-                # Búsqueda
                 search_query = st.text_input(
                     "🔍 Buscar por nombre",
                     placeholder="placas base, portátiles...",
                     key="cache_search"
                 )
                 
-                # Filtrar si hay búsqueda
                 if search_query:
                     analyses = cache_manager.search_analyses(search_query)
                 
                 if analyses:
-                    # Selector de análisis
                     analysis_options = {
                         f"{item['name']} ({item['stats']['total_keywords']:,} kws) - {item['timestamp'][:10]}": item['id']
                         for item in analyses
@@ -551,8 +520,6 @@ def main():
                     
                     if selected_name:
                         selected_id = analysis_options[selected_name]
-                        
-                        # Mostrar detalles del análisis seleccionado
                         selected_analysis = next(item for item in analyses if item['id'] == selected_id)
                         
                         with st.expander("ℹ️ Detalles", expanded=False):
@@ -562,7 +529,6 @@ def main():
                             st.write(f"**Volumen total:** {selected_analysis['stats']['total_volume']:,}")
                             st.write(f"**Proveedor:** {selected_analysis['stats']['provider']}")
                         
-                        # Botones de acción
                         col_btn1, col_btn2 = st.columns(2)
                         
                         with col_btn1:
@@ -571,10 +537,8 @@ def main():
                                     loaded = cache_manager.load_analysis(selected_id)
                                     
                                     if loaded:
-                                        # Cargar en session_state
                                         st.session_state.keyword_universe = loaded['keyword_universe']
                                         
-                                        # Cargar datos procesados si existen
                                         if 'processed_data' in loaded:
                                             st.session_state.processed_data = pd.DataFrame(loaded['processed_data'])
                                         
@@ -597,7 +561,6 @@ def main():
                 st.info("📭 No hay análisis guardados aún")
                 st.caption("Los análisis se guardan automáticamente al completarse")
             
-            # Opciones de gestión
             st.markdown("---")
             st.markdown("#### Gestión de Caché")
             
@@ -606,19 +569,15 @@ def main():
                 st.success(f"✅ {count} análisis eliminados")
                 st.rerun()
         
-        st.divider()
-
         # Widget de Progreso de Análisis
         with st.expander("📊 Progreso de Informes", expanded=True):
             st.markdown("### Estado del Informe Completo")
             
             completed, total = get_analysis_progress()
             
-            # Barra de progreso
             progress_percentage = completed / total if total > 0 else 0
             st.progress(progress_percentage)
             
-            # Métricas
             col_prog1, col_prog2 = st.columns(2)
             with col_prog1:
                 st.metric("Completados", f"{completed}/{total}")
@@ -630,7 +589,6 @@ def main():
             
             st.caption(f"**{int(progress_percentage * 100)}%** del informe completo")
             
-            # Lista de análisis con estado
             st.markdown("#### Análisis Disponibles")
             
             for analysis_type, analysis_data in st.session_state.multi_analyses.items():
@@ -649,7 +607,6 @@ def main():
                     else:
                         st.markdown(f"**{analysis_type}**")
             
-            # Botón de reset (solo si hay alguno completado)
             if completed > 0:
                 st.markdown("---")
                 if st.button("🔄 Reiniciar Todos los Análisis", key="reset_all_analyses"):
@@ -657,15 +614,15 @@ def main():
                     st.success("✅ Análisis reiniciados")
                     st.rerun()
         
-        # Info
+        st.divider()
         st.info("💡 **Tip:** Sube archivos CSV o Excel de Ahrefs, Semrush o similar con columnas: keyword, volume, traffic")
     
-    # Tabs principales - ACTUALIZADO: 6 tabs ahora
+    # Tabs principales
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "📁 Carga de Datos", 
         "🧠 Análisis con IA", 
         "📊 Visualización",
-        "🏗️ Arquitectura Web",  # NUEVA TAB
+        "🏗️ Arquitectura Web",
         "🎯 Oportunidades",
         "📥 Exportar"
     ])
@@ -677,7 +634,6 @@ def main():
         col1, col2 = st.columns([2, 1])
         
         with col1:
-            # Opción 1: Cargar archivos
             st.subheader("Opción 1: Cargar archivos exportados")
             uploaded_files = st.file_uploader(
                 "Sube archivos CSV o Excel de tus competidores",
@@ -690,7 +646,6 @@ def main():
                 st.session_state.uploaded_files = uploaded_files
                 st.success(f"✅ {len(uploaded_files)} archivo(s) cargado(s)")
                 
-                # Preview de los datos
                 for file in uploaded_files:
                     with st.expander(f"👁️ Preview: {file.name}"):
                         try:
@@ -705,64 +660,53 @@ def main():
                             st.error(f"Error al leer el archivo: {str(e)}")
         
         with col2:
-            # Opción 2: Integración directa con Semrush
             st.subheader("Opción 2: Semrush API")
             
             if semrush_key:
-                # Selector de tipo de análisis
                 analysis_mode = st.radio(
                     "Tipo de análisis",
                     ["🌐 Dominios", "🔗 URLs", "📁 Directorios", "📋 Mixto"],
                     help="""
-                    - Dominios: Analiza un dominio completo (ej: example.com)
-                    - URLs: Analiza páginas específicas (ej: example.com/producto)
-                    - Directorios: Analiza secciones del sitio (ej: example.com/blog/)
+                    - Dominios: Analiza un dominio completo
+                    - URLs: Analiza páginas específicas
+                    - Directorios: Analiza secciones del sitio
                     - Mixto: Combina dominios, URLs y directorios
                     """
                 )
                 
-                # Inputs según el modo
                 if analysis_mode == "🌐 Dominios":
                     targets_input = st.text_area(
                         "Dominios (uno por línea)",
-                        placeholder="example.com\ncompetitor.com\nanother-site.com",
-                        height=150,
-                        help="Analiza dominios completos. Puedes incluir o no 'https://'"
+                        placeholder="example.com\ncompetitor.com",
+                        height=150
                     )
                     target_type = 'domain'
                     
                 elif analysis_mode == "🔗 URLs":
                     targets_input = st.text_area(
                         "URLs completas (una por línea)",
-                        placeholder="https://example.com/producto/nombre\nhttps://competitor.com/servicio/detalle\nhttps://example.com/blog/post",
-                        height=150,
-                        help="Analiza páginas específicas con sus keywords"
+                        placeholder="https://example.com/producto",
+                        height=150
                     )
                     target_type = 'url'
                     
                 elif analysis_mode == "📁 Directorios":
                     targets_input = st.text_area(
                         "Directorios (uno por línea)",
-                        placeholder="example.com/blog/\ncompetitor.com/productos/\nexample.com/recursos/",
-                        height=150,
-                        help="Analiza secciones completas del sitio (subdirectorios)"
+                        placeholder="example.com/blog/",
+                        height=150
                     )
                     target_type = 'directory'
                     
-                else:  # Mixto
+                else:
                     st.info("💡 En modo mixto, especifica el tipo al lado de cada entrada")
                     targets_input = st.text_area(
-                        "Targets (uno por línea, formato: tipo|valor)",
-                        placeholder="""domain|example.com
-url|https://competitor.com/producto
-directory|example.com/blog/
-domain|another-site.com""",
-                        height=180,
-                        help="Formato: domain|example.com, url|..., o directory|..."
+                        "Targets (formato: tipo|valor)",
+                        placeholder="domain|example.com\nurl|https://competitor.com/producto",
+                        height=180
                     )
                     target_type = 'mixed'
                 
-                # Opciones adicionales
                 col_opt1, col_opt2 = st.columns(2)
                 with col_opt1:
                     semrush_limit = st.number_input(
@@ -770,31 +714,22 @@ domain|another-site.com""",
                         min_value=10,
                         max_value=10000,
                         value=500,
-                        step=50,
-                        help="Número máximo de keywords a extraer por cada dominio/URL/directorio"
+                        step=50
                     )
                 
                 with col_opt2:
                     semrush_database = st.selectbox(
                         "Base de datos",
-                        ["us", "uk", "es", "fr", "de", "it", "br", "mx", "ar"],
-                        help="País/región de la base de datos de Semrush"
+                        ["us", "uk", "es", "fr", "de", "it", "br", "mx", "ar"]
                     )
                 
-                filter_branded = st.checkbox(
-                    "Filtrar keywords de marca",
-                    value=True,
-                    help="Elimina keywords que contienen el nombre del dominio"
-                )
+                filter_branded = st.checkbox("Filtrar keywords de marca", value=True)
                 
-                # Botón de obtención
                 if st.button("🔍 Obtener Keywords de Semrush", type="primary", use_container_width=True):
                     if targets_input:
-                        # Parsear targets
                         targets_list = []
                         
                         if target_type == 'mixed':
-                            # Modo mixto: parsear cada línea
                             for line in targets_input.split('\n'):
                                 line = line.strip()
                                 if '|' in line:
@@ -803,19 +738,12 @@ domain|another-site.com""",
                                     valor = valor.strip()
                                     
                                     if tipo in ['domain', 'url', 'directory'] and valor:
-                                        targets_list.append({
-                                            'target': valor,
-                                            'type': tipo
-                                        })
+                                        targets_list.append({'target': valor, 'type': tipo})
                         else:
-                            # Modo simple: todos son del mismo tipo
                             for line in targets_input.split('\n'):
                                 line = line.strip()
                                 if line:
-                                    targets_list.append({
-                                        'target': line,
-                                        'type': target_type
-                                    })
+                                    targets_list.append({'target': line, 'type': target_type})
                         
                         if not targets_list:
                             st.error("❌ No se encontraron targets válidos")
@@ -824,7 +752,6 @@ domain|another-site.com""",
                                 try:
                                     semrush = SemrushService(semrush_key)
                                     
-                                    # Usar batch_get_keywords para múltiples targets
                                     all_data = semrush.batch_get_keywords(
                                         targets=targets_list,
                                         limit=semrush_limit,
@@ -833,13 +760,10 @@ domain|another-site.com""",
                                     )
                                     
                                     if len(all_data) > 0:
-                                        # Guardar en session state
                                         st.session_state.processed_data = all_data
                                         
-                                        # Mostrar resumen
                                         st.success(f"✅ {len(all_data)} keywords obtenidas exitosamente")
                                         
-                                        # Resumen por tipo/source
                                         col_sum1, col_sum2, col_sum3 = st.columns(3)
                                         
                                         with col_sum1:
@@ -851,7 +775,6 @@ domain|another-site.com""",
                                         with col_sum3:
                                             st.metric("Tráfico Total", f"{all_data['traffic'].sum():,.0f}")
                                         
-                                        # Mostrar distribución por source
                                         if 'source' in all_data.columns:
                                             with st.expander("📊 Distribución por Source"):
                                                 source_summary = all_data.groupby(['source', 'source_type']).agg({
@@ -862,7 +785,6 @@ domain|another-site.com""",
                                                 source_summary.columns = ['Source', 'Tipo', 'Keywords', 'Volumen', 'Tráfico']
                                                 st.dataframe(source_summary, use_container_width=True)
                                         
-                                        # Preview de datos
                                         with st.expander("👁️ Preview de los datos"):
                                             st.dataframe(
                                                 safe_preview_dataframe(all_data, n=20),
@@ -885,7 +807,6 @@ domain|another-site.com""",
     with tab2:
         st.header("Análisis con IA")
         
-        # Validar API keys según proveedor
         if ai_provider == "Claude (Anthropic)" and not anthropic_key:
             st.warning("⚠️ Por favor ingresa tu API key de Anthropic en la barra lateral")
             return
@@ -900,7 +821,6 @@ domain|another-site.com""",
             st.info("📁 Primero carga datos en la pestaña 'Carga de Datos'")
             return
         
-        # Preparar datos
         if st.session_state.processed_data is None and st.session_state.uploaded_files:
             processor = DataProcessor()
             st.session_state.processed_data = processor.process_files(
@@ -911,7 +831,6 @@ domain|another-site.com""",
         if st.session_state.processed_data is not None:
             df = st.session_state.processed_data
             
-            # Métricas rápidas
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.metric("Total Keywords", f"{len(df):,}")
@@ -924,7 +843,6 @@ domain|another-site.com""",
             
             st.divider()
             
-            # Configuración del prompt
             col1, col2 = st.columns([2, 1])
             
             with col1:
@@ -950,10 +868,11 @@ domain|another-site.com""",
                 include_trends = st.checkbox("Identificar tendencias emergentes", value=True)
                 include_gaps = st.checkbox("Detectar gaps de contenido", value=True)
             
-            # VERIFICAR CACHÉ ANTES DE ANALIZAR
             cache_manager = CacheManager()
             data_hash = cache_manager.get_data_hash(df)
             cached_analysis_id = cache_manager.find_cached_analysis(data_hash, analysis_type, num_tiers)
+            
+            force_new = True
             
             if cached_analysis_id:
                 st.info(f"💾 Ya existe un análisis de **{analysis_type}** con {num_tiers} tiers para estos datos en caché")
@@ -977,10 +896,7 @@ domain|another-site.com""",
                 with col_cache_opt2:
                     st.caption("O ejecuta nuevo análisis:")
                     force_new = st.checkbox("Forzar nuevo análisis", value=False)
-            else:
-                force_new = True  # No hay caché, siempre nuevo
-
-            # Estimación de costes
+            
             st.divider()
             st.subheader("💰 Estimación de Costos")
             
@@ -992,7 +908,7 @@ domain|another-site.com""",
                 cost_est = estimate_analysis_cost(model_choice, len(df))
                 provider_name = "OpenAI"
                 model_name = model_choice
-            else:  # Ambos
+            else:
                 cost_est_claude = estimate_analysis_cost(claude_model, len(df))
                 cost_est_openai = estimate_analysis_cost(openai_model, len(df))
                 cost_est = {
@@ -1011,10 +927,9 @@ domain|another-site.com""",
             with col3:
                 st.metric("Tokens (output)", f"{cost_est['output_tokens']:,}")
             
-            # Verificar si existe en caché
             if cache_enabled:
-                cache_manager = get_cache_manager()
-                test_hash = cache_manager.generate_hash(
+                cache_manager_check = get_cache_manager()
+                test_hash = cache_manager_check.generate_hash(
                     df=df,
                     analysis_type=analysis_type,
                     num_tiers=num_tiers,
@@ -1024,38 +939,36 @@ domain|another-site.com""",
                     include_gaps=include_gaps
                 )
                 
-                cached_result = cache_manager.get_cached_analysis(test_hash, ttl_hours)
+                cached_result = cache_manager_check.get_cached_analysis(test_hash, ttl_hours)
                 
                 if cached_result:
                     st.success(f"""
-            ✅ **Análisis disponible en caché**
-            
-            Este análisis ya fue realizado anteriormente y está disponible en caché.
-            
-            - **Proveedor:** {cached_result.get('_cache_metadata', {}).get('provider', 'N/A')}
-            - **Antigüedad:** {cached_result.get('_cache_metadata', {}).get('age_hours', 0):.1f} horas
-            - **Ahorro:** ${cost_est['cost']:.4f}
-            
-            Al hacer clic en "Analizar", se recuperará del caché sin consumir créditos.
+✅ **Análisis disponible en caché**
+
+Este análisis ya fue realizado anteriormente y está disponible en caché.
+
+- **Proveedor:** {cached_result.get('_cache_metadata', {}).get('provider', 'N/A')}
+- **Antigüedad:** {cached_result.get('_cache_metadata', {}).get('age_hours', 0):.1f} horas
+- **Ahorro:** ${cost_est['cost']:.4f}
+
+Al hacer clic en "Analizar", se recuperará del caché sin consumir créditos.
                     """)
                 else:
                     st.info(f"""
-            ℹ️ **Análisis nuevo**
-            
-            Este análisis no está en caché y consumirá:
-            - **${cost_est['cost']:.4f}** en créditos de API
-            - **{cost_est['input_tokens'] + cost_est['output_tokens']:,}** tokens
-            
-            Quedará guardado en caché para futuras consultas.
+ℹ️ **Análisis nuevo**
+
+Este análisis no está en caché y consumirá:
+- **${cost_est['cost']:.4f}** en créditos de API
+- **{cost_est['input_tokens'] + cost_est['output_tokens']:,}** tokens
+
+Quedará guardado en caché para futuras consultas.
                     """)
             
             st.divider()
             
-            # Botón de análisis
             if st.button("🚀 Analizar con IA", type="primary", use_container_width=True):
                 with st.spinner(f"🧠 {ai_provider.split('(')[0].strip()} está analizando tu universo de keywords..."):
                     try:
-                        # Parámetros del análisis para el caché
                         analysis_params = {
                             'analysis_type': analysis_type,
                             'num_tiers': num_tiers,
@@ -1066,15 +979,10 @@ domain|another-site.com""",
                         }
                         
                         if ai_provider == "Claude (Anthropic)":
-                            # Análisis con Claude
                             anthropic_service = AnthropicService(anthropic_key, model_choice)
                             
-                            prompt = anthropic_service.create_universe_prompt(
-                                df,
-                                **analysis_params
-                            )
+                            prompt = anthropic_service.create_universe_prompt(df, **analysis_params)
                             
-                            # Pasar use_cache y params
                             result = anthropic_service.analyze_keywords(
                                 prompt,
                                 df,
@@ -1085,17 +993,12 @@ domain|another-site.com""",
                             result['model'] = model_choice
                             
                         elif ai_provider == "OpenAI":
-                            # Análisis con OpenAI
                             from app.services.openai_service import OpenAIService
                             
                             openai_service = OpenAIService(openai_key, model_choice)
                             
-                            messages = openai_service.create_universe_prompt(
-                                df,
-                                **analysis_params
-                            )
+                            messages = openai_service.create_universe_prompt(df, **analysis_params)
                             
-                            # Pasar use_cache y params
                             result = openai_service.analyze_keywords(
                                 messages,
                                 df,
@@ -1105,10 +1008,9 @@ domain|another-site.com""",
                             result['provider'] = 'OpenAI'
                             result['model'] = model_choice
                             
-                        else:  # Ambos (Validación Cruzada)
+                        else:
                             from app.services.openai_service import OpenAIService
                             
-                            # Análisis con Claude
                             st.info("1️⃣ Analizando con Claude...")
                             anthropic_service = AnthropicService(anthropic_key, claude_model)
                             
@@ -1120,7 +1022,6 @@ domain|another-site.com""",
                                 **analysis_params
                             )
                             
-                            # Análisis con OpenAI
                             st.info("2️⃣ Analizando con OpenAI...")
                             openai_service = OpenAIService(openai_key, openai_model)
                             
@@ -1132,11 +1033,9 @@ domain|another-site.com""",
                                 **analysis_params
                             )
                             
-                            # Validación cruzada
                             st.info("3️⃣ Comparando resultados...")
                             comparison = openai_service.compare_with_claude(result_claude, df)
                             
-                            # Combinar resultados
                             result = {
                                 'summary': f"**Análisis de Claude:**\n{result_claude.get('summary', '')}\n\n**Análisis de OpenAI:**\n{result_openai.get('summary', '')}",
                                 'topics': result_claude.get('topics', []),
@@ -1153,6 +1052,15 @@ domain|another-site.com""",
                         
                         st.session_state.keyword_universe = result
                         
+                        # GUARDAR EN HISTORIAL DE ANÁLISIS
+                        if result not in st.session_state.analyses_history:
+                            st.session_state.analyses_history.append({
+                                'timestamp': datetime.now(),
+                                'analysis_type': analysis_type,
+                                'provider': result.get('provider', 'N/A'),
+                                'result': result
+                            })
+                        
                         # Mostrar si vino del caché
                         if result.get('_cache_metadata', {}).get('cached', False):
                             st.success("✅ ¡Análisis completado! (Recuperado del caché)")
@@ -1162,123 +1070,103 @@ domain|another-site.com""",
                         
                         st.balloons()
                         
+                        # AUTO-GUARDAR EN BACKGROUND
+                        try:
+                            auto_name = f"{analysis_type} - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                            
+                            metadata = {
+                                'name': auto_name,
+                                'description': f"Auto-guardado: {analysis_type} con {num_tiers} tiers",
+                                'analysis_type': analysis_type,
+                                'num_tiers': num_tiers,
+                                'total_keywords': len(df),
+                                'total_volume': int(df['volume'].sum()),
+                                'custom_instructions': custom_instructions,
+                                'data_hash': data_hash,
+                                'cache_key': cache_manager._generate_cache_key(data_hash, analysis_type, num_tiers)
+                            }
+                            
+                            analysis_id = cache_manager.save_analysis(
+                                keyword_universe=result,
+                                processed_data=df,
+                                metadata=metadata,
+                                auto_save=True
+                            )
+                            
+                            st.success(f"💾 Análisis guardado automáticamente (ID: {analysis_id[:12]}...)")
+                            
+                        except Exception as e:
+                            st.warning(f"⚠️ No se pudo auto-guardar: {str(e)}")
+                        
+                        # OPCIÓN DE GUARDADO MANUAL CON NOMBRE PERSONALIZADO
+                        st.divider()
+                        st.subheader("💾 Guardar con Nombre Personalizado")
+                        
+                        with st.form("save_analysis_form", clear_on_submit=False):
+                            st.markdown("Opcionalmente, guarda este análisis con un nombre más descriptivo:")
+                            
+                            col_form1, col_form2 = st.columns([3, 1])
+                            
+                            with col_form1:
+                                custom_name = st.text_input(
+                                    "Nombre personalizado",
+                                    value="",
+                                    placeholder="Ej: Placas base AMD 2024",
+                                    help="Deja vacío para usar el nombre automático"
+                                )
+                                
+                                custom_description = st.text_area(
+                                    "Descripción detallada",
+                                    value="",
+                                    placeholder="Ej: Análisis temático de placas base AMD para mercado español, enfoque en gaming",
+                                    height=80
+                                )
+                            
+                            with col_form2:
+                                st.markdown("&nbsp;")
+                                st.markdown("&nbsp;")
+                                submitted = st.form_submit_button(
+                                    "💾 Guardar Personalizado",
+                                    type="secondary",
+                                    use_container_width=True
+                                )
+                            
+                            if submitted and (custom_name or custom_description):
+                                try:
+                                    final_name = custom_name if custom_name else auto_name
+                                    final_description = custom_description if custom_description else metadata['description']
+                                    
+                                    custom_metadata = metadata.copy()
+                                    custom_metadata['name'] = final_name
+                                    custom_metadata['description'] = final_description
+                                    
+                                    custom_id = cache_manager.save_analysis(
+                                        keyword_universe=result,
+                                        processed_data=df,
+                                        metadata=custom_metadata,
+                                        auto_save=False
+                                    )
+                                    
+                                    st.success(f"✅ Guardado personalizado: {final_name}")
+                                    st.info("💡 Puedes encontrarlo en la barra lateral → 💾 Análisis Guardados")
+                                    
+                                except Exception as e:
+                                    st.error(f"❌ Error al guardar: {str(e)}")
+                        
+                        st.caption("💡 **Nota:** Ya se guardó automáticamente. El guardado personalizado crea una copia adicional con tu nombre.")
+                        
                     except Exception as e:
                         st.error(f"❌ Error en el análisis: {str(e)}")
                         import traceback
                         with st.expander("Ver detalles del error"):
                             st.code(traceback.format_exc())
-                            
-                            # GUARDAR EN HISTORIAL DE ANÁLISIS (NUEVO)
-                            if result not in st.session_state.analyses_history:
-                                st.session_state.analyses_history.append({
-                                    'timestamp': datetime.now(),
-                                    'analysis_type': analysis_type,
-                                    'provider': result.get('provider', 'N/A'),
-                                    'result': result
-                                })
-                            
-                            st.success("✅ ¡Análisis completado!")
-                            st.balloons()
-                            
-                            # AUTO-GUARDAR EN BACKGROUND
-                            try:
-                                auto_name = f"{analysis_type} - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-                                
-                                metadata = {
-                                    'name': auto_name,
-                                    'description': f"Auto-guardado: {analysis_type} con {num_tiers} tiers",
-                                    'analysis_type': analysis_type,
-                                    'num_tiers': num_tiers,
-                                    'total_keywords': len(df),
-                                    'total_volume': int(df['volume'].sum()),
-                                    'custom_instructions': custom_instructions,
-                                    'data_hash': data_hash,
-                                    'cache_key': cache_manager._generate_cache_key(data_hash, analysis_type, num_tiers)
-                                }
-                                
-                                analysis_id = cache_manager.save_analysis(
-                                    keyword_universe=result,
-                                    processed_data=df,
-                                    metadata=metadata,
-                                    auto_save=True
-                                )
-                                
-                                st.success(f"💾 Análisis guardado automáticamente (ID: {analysis_id[:12]}...)")
-                                
-                            except Exception as e:
-                                st.warning(f"⚠️ No se pudo auto-guardar: {str(e)}")
-                            
-                            # OPCIÓN DE GUARDADO MANUAL CON NOMBRE PERSONALIZADO
-                            st.divider()
-                            st.subheader("💾 Guardar con Nombre Personalizado")
-                            
-                            with st.form("save_analysis_form", clear_on_submit=False):
-                                st.markdown("Opcionalmente, guarda este análisis con un nombre más descriptivo:")
-                                
-                                col_form1, col_form2 = st.columns([3, 1])
-                                
-                                with col_form1:
-                                    custom_name = st.text_input(
-                                        "Nombre personalizado",
-                                        value="",
-                                        placeholder="Ej: Placas base AMD 2024",
-                                        help="Deja vacío para usar el nombre automático"
-                                    )
-                                    
-                                    custom_description = st.text_area(
-                                        "Descripción detallada",
-                                        value="",
-                                        placeholder="Ej: Análisis temático de placas base AMD para mercado español, enfoque en gaming",
-                                        height=80
-                                    )
-                                
-                                with col_form2:
-                                    st.markdown("&nbsp;")
-                                    st.markdown("&nbsp;")
-                                    submitted = st.form_submit_button(
-                                        "💾 Guardar Personalizado",
-                                        type="secondary",
-                                        use_container_width=True
-                                    )
-                                
-                                if submitted and (custom_name or custom_description):
-                                    try:
-                                        final_name = custom_name if custom_name else auto_name
-                                        final_description = custom_description if custom_description else metadata['description']
-                                        
-                                        custom_metadata = metadata.copy()
-                                        custom_metadata['name'] = final_name
-                                        custom_metadata['description'] = final_description
-                                        
-                                        custom_id = cache_manager.save_analysis(
-                                            keyword_universe=result,
-                                            processed_data=df,
-                                            metadata=custom_metadata,
-                                            auto_save=False
-                                        )
-                                        
-                                        st.success(f"✅ Guardado personalizado: {final_name}")
-                                        st.info("💡 Puedes encontrarlo en la barra lateral → 💾 Análisis Guardados")
-                                        
-                                    except Exception as e:
-                                        st.error(f"❌ Error al guardar: {str(e)}")
-                            
-                            st.caption("💡 **Nota:** Ya se guardó automáticamente. El guardado personalizado crea una copia adicional con tu nombre.")
-                            
-                        except Exception as e:
-                            st.error(f"❌ Error en el análisis: {str(e)}")
-                            import traceback
-                            with st.expander("Ver detalles del error"):
-                                st.code(traceback.format_exc())
             
-            # Mostrar resultados si existen
             if st.session_state.keyword_universe:
                 st.divider()
                 st.subheader("📋 Resultados del Análisis")
                 
                 result = st.session_state.keyword_universe
                 
-                # Mostrar info del proveedor
                 provider_col1, provider_col2 = st.columns(2)
                 with provider_col1:
                     st.metric("Proveedor de IA", result.get('provider', 'N/A'))
@@ -1288,11 +1176,9 @@ domain|another-site.com""",
                     else:
                         st.metric("Modelo", result.get('model', 'N/A'))
                 
-                # Resumen ejecutivo
                 with st.expander("📊 Resumen Ejecutivo", expanded=True):
                     st.markdown(result.get('summary', 'No disponible'))
                 
-                # Si es validación cruzada, mostrar comparación
                 if result.get('provider') == 'Ambos' and 'comparison' in result:
                     with st.expander("🔄 Validación Cruzada", expanded=True):
                         comp = result['comparison']
@@ -1309,13 +1195,11 @@ domain|another-site.com""",
                             for improvement in comp['improvements']:
                                 st.markdown(f"- {improvement}")
                 
-                # Topics por tier
                 if 'topics' in result:
                     st.subheader("🎯 Topics Identificados (Claude)" if result.get('provider') == 'Ambos' else "🎯 Topics Identificados")
                     
                     topics_df = pd.DataFrame(result['topics'])
                     
-                    # Filtros
                     col1, col2 = st.columns(2)
                     with col1:
                         tier_filter = st.multiselect(
@@ -1333,7 +1217,6 @@ domain|another-site.com""",
                     
                     st.dataframe(filtered_topics, use_container_width=True, height=400)
                 
-                # Si hay análisis de OpenAI también, mostrarlo
                 if result.get('provider') == 'Ambos' and 'topics_openai' in result:
                     st.subheader("🎯 Topics Identificados (OpenAI)")
                     topics_openai_df = pd.DataFrame(result['topics_openai'])
@@ -1344,7 +1227,7 @@ domain|another-site.com""",
         st.header("Visualización del Keyword Universe")
         
         if st.session_state.keyword_universe is None:
-            st.info("🧠 Primero realiza el análisis con Claude en la pestaña anterior")
+            st.info("🧠 Primero realiza el análisis con IA en la pestaña anterior")
             return
         
         result = st.session_state.keyword_universe
@@ -1353,27 +1236,22 @@ domain|another-site.com""",
             visualizer = KeywordVisualizer()
             topics_df = pd.DataFrame(result['topics'])
             
-            # Gráfico de burbujas
             st.subheader("🫧 Mapa de Topics (Bubble Chart)")
-            
             fig_bubble = visualizer.create_bubble_chart(topics_df)
             st.plotly_chart(fig_bubble, use_container_width=True)
             
             col1, col2 = st.columns(2)
             
             with col1:
-                # Treemap
                 st.subheader("🗺️ Treemap por Volumen")
                 fig_treemap = visualizer.create_treemap(topics_df)
                 st.plotly_chart(fig_treemap, use_container_width=True)
             
             with col2:
-                # Sunburst
                 st.subheader("☀️ Distribución por Tier")
                 fig_sunburst = visualizer.create_sunburst(topics_df)
                 st.plotly_chart(fig_sunburst, use_container_width=True)
             
-            # Análisis de gaps
             if 'gaps' in result:
                 st.divider()
                 st.subheader("🎯 Oportunidades de Contenido")
@@ -1382,12 +1260,11 @@ domain|another-site.com""",
                     with st.expander(f"💡 Oportunidad {i+1}: {gap.get('topic', 'N/A')}"):
                         st.markdown(gap.get('description', 'N/A'))
                         st.metric("Volumen potencial", f"{gap.get('volume', 0):,.0f}")
-
-    # TAB 4: ARQUITECTURA WEB (NUEVO)
+    
+    # TAB 4: Arquitectura Web
     with tab4:
         st.header("🏗️ Propuesta de Arquitectura Web")
         
-        # Verificar que hay análisis previos
         if not st.session_state.keyword_universe:
             st.info("🧠 Primero realiza al menos un análisis en la pestaña 'Análisis con IA'")
             st.markdown("""
@@ -1416,10 +1293,8 @@ domain|another-site.com""",
             height=100
         )
         
-        # Botón para generar arquitectura
         if st.button("🏗️ Generar Arquitectura Web", type="primary", use_container_width=True):
             
-            # Validar API keys
             if arch_provider in ["Claude", "Ambos"] and not anthropic_key:
                 st.error("⚠️ Necesitas la API key de Anthropic")
                 return
@@ -1430,7 +1305,6 @@ domain|another-site.com""",
             
             with st.spinner(f"🏗️ Generando arquitectura web..."):
                 try:
-                    # Crear servicio de arquitectura
                     arch_service = ArchitectureService(
                         anthropic_key=anthropic_key if arch_provider in ["Claude", "Ambos"] else None,
                         openai_key=openai_key if arch_provider in ["OpenAI", "Ambos"] else None,
@@ -1438,7 +1312,6 @@ domain|another-site.com""",
                         openai_model=openai_model
                     )
                     
-                    # Generar arquitectura
                     architecture = arch_service.generate_architecture(
                         analysis_results=st.session_state.keyword_universe,
                         df=st.session_state.processed_data,
@@ -1446,7 +1319,6 @@ domain|another-site.com""",
                         custom_instructions=custom_arch_instructions
                     )
                     
-                    # Guardar en session state
                     st.session_state.architecture = architecture
                     
                     st.success("✅ ¡Arquitectura generada exitosamente!")
@@ -1458,14 +1330,12 @@ domain|another-site.com""",
                     with st.expander("Ver detalles del error"):
                         st.code(traceback.format_exc())
         
-        # Mostrar resultados si existen
         if st.session_state.architecture:
             st.divider()
             st.subheader("📋 Arquitectura Propuesta")
             
             arch = st.session_state.architecture
             
-            # Info del proveedor
             provider_col1, provider_col2 = st.columns(2)
             with provider_col1:
                 st.metric("Proveedor", arch.get('provider', 'N/A'))
@@ -1475,11 +1345,9 @@ domain|another-site.com""",
                 else:
                     st.metric("Modelo", arch.get('model', 'N/A'))
             
-            # Resumen ejecutivo
             with st.expander("📊 Resumen Ejecutivo", expanded=True):
                 st.markdown(arch.get('overview', 'No disponible'))
             
-            # Estructura del sitio
             if 'site_structure' in arch and 'main_sections' in arch['site_structure']:
                 st.subheader("🗂️ Estructura del Sitio")
                 
@@ -1501,7 +1369,6 @@ domain|another-site.com""",
                             for subsection in section['subsections']:
                                 st.markdown(f"- `{subsection.get('url', 'N/A')}` - {subsection.get('name', 'N/A')}")
             
-            # Estrategia de contenido
             if 'content_strategy' in arch:
                 st.divider()
                 st.subheader("📝 Estrategia de Contenido")
@@ -1517,7 +1384,6 @@ domain|another-site.com""",
                             st.markdown(f"**Artículos de soporte:** {pillar.get('supporting_articles', 0)}")
                             st.markdown(f"**Prioridad:** {pillar.get('priority', 'N/A')}")
             
-            # Roadmap de implementación
             if 'implementation_roadmap' in arch:
                 st.divider()
                 st.subheader("📅 Roadmap de Implementación")
@@ -1527,8 +1393,8 @@ domain|another-site.com""",
                         st.markdown(f"**Foco:** {phase.get('focus', 'N/A')}")
                         st.markdown(f"**Páginas a crear:** {phase.get('pages_to_create', 0)}")
                         st.markdown(f"**Esfuerzo estimado:** {phase.get('estimated_effort', 'N/A')}")
-
-    # TAB 5: OPORTUNIDADES
+    
+    # TAB 5: Oportunidades
     with tab5:
         st.header("🎯 Oportunidades Identificadas")
         
@@ -1537,10 +1403,8 @@ domain|another-site.com""",
         else:
             result = st.session_state.keyword_universe
             
-            # Resumen ejecutivo de oportunidades
             st.subheader("📊 Resumen de Oportunidades")
             
-            # Calcular totales
             total_opportunities = 0
             gaps_count = len(result.get('gaps', []))
             trends_count = len(result.get('trends', []))
@@ -1552,40 +1416,22 @@ domain|another-site.com""",
             
             total_opportunities = gaps_count + trends_count + tier1_count
             
-            # Métricas principales
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
-                st.metric(
-                    "Total Oportunidades",
-                    total_opportunities,
-                    help="Suma de gaps, tendencias y topics Tier 1"
-                )
+                st.metric("Total Oportunidades", total_opportunities)
             
             with col2:
-                st.metric(
-                    "Gaps de Contenido",
-                    gaps_count,
-                    help="Topics con alto volumen pero poca cobertura"
-                )
+                st.metric("Gaps de Contenido", gaps_count)
             
             with col3:
-                st.metric(
-                    "Tendencias Emergentes",
-                    trends_count,
-                    help="Keywords en crecimiento"
-                )
+                st.metric("Tendencias Emergentes", trends_count)
             
             with col4:
-                st.metric(
-                    "Topics Prioritarios",
-                    tier1_count,
-                    help="Topics Tier 1 - máxima prioridad"
-                )
+                st.metric("Topics Prioritarios", tier1_count)
             
             st.divider()
             
-            # Filtros y ordenación
             col1, col2 = st.columns([3, 1])
             
             with col1:
@@ -1601,10 +1447,8 @@ domain|another-site.com""",
                     ["Volumen (mayor)", "Volumen (menor)", "Nombre"]
                 )
             
-            # Preparar todas las oportunidades
             all_opportunities = []
             
-            # 1. Gaps de contenido
             if "Gaps de Contenido" in opportunity_filter and gaps_count > 0:
                 for gap in result['gaps']:
                     all_opportunities.append({
@@ -1619,7 +1463,6 @@ domain|another-site.com""",
                         'icon': '🎯'
                     })
             
-            # 2. Tendencias emergentes
             if "Tendencias" in opportunity_filter and trends_count > 0:
                 for trend in result['trends']:
                     all_opportunities.append({
@@ -1634,7 +1477,6 @@ domain|another-site.com""",
                         'icon': '📈'
                     })
             
-            # 3. Topics Tier 1
             if "Topics Tier 1" in opportunity_filter and tier1_count > 0:
                 tier1_topics = [t for t in result.get('topics', []) if t.get('tier') == 1]
                 
@@ -1651,27 +1493,23 @@ domain|another-site.com""",
                         'icon': '⭐'
                     })
             
-            # Ordenar según filtro
             if sort_by == "Volumen (mayor)":
                 all_opportunities.sort(key=lambda x: x['volumen'], reverse=True)
             elif sort_by == "Volumen (menor)":
                 all_opportunities.sort(key=lambda x: x['volumen'])
-            else:  # Nombre
+            else:
                 all_opportunities.sort(key=lambda x: x['nombre'])
             
-            # Mostrar oportunidades
             if not all_opportunities:
                 st.warning("No hay oportunidades que coincidan con los filtros seleccionados")
             else:
                 st.subheader(f"📋 {len(all_opportunities)} Oportunidades Encontradas")
                 
-                # Mostrar en cards expandibles
                 for i, opp in enumerate(all_opportunities):
                     with st.expander(
                         f"{opp['icon']} {opp['nombre']} - {format_number(opp['volumen'])} búsquedas/mes",
-                        expanded=(i < 5)  # Primeras 5 expandidas
+                        expanded=(i < 5)
                     ):
-                        # Header con badges
                         col1, col2, col3 = st.columns([2, 1, 1])
                         
                         with col1:
@@ -1688,7 +1526,6 @@ domain|another-site.com""",
                         
                         st.divider()
                         
-                        # Métricas
                         col1, col2 = st.columns(2)
                         
                         with col1:
@@ -1697,25 +1534,21 @@ domain|another-site.com""",
                         with col2:
                             st.metric("Keywords Relacionadas", opp['keywords'])
                         
-                        # Descripción
                         st.markdown("**Descripción:**")
                         st.write(opp['descripcion'])
                         
-                        # Acciones recomendadas
                         st.markdown("**Acción Recomendada:**")
                         if opp['tipo'] == 'Gap de Contenido':
                             st.info("💡 Crear contenido completo que cubra este tema. Poca competencia actual.")
                         elif opp['tipo'] == 'Tendencia Emergente':
                             st.info("💡 Actuar rápido para posicionarse antes que la competencia.")
-                        else:  # Topic Prioritario
+                        else:
                             st.info("💡 Priorizar en la estrategia de contenido. Alto ROI potencial.")
             
-            # Sección de priorización
             if all_opportunities:
                 st.divider()
                 st.subheader("📊 Matriz de Priorización")
                 
-                # Crear DataFrame para la matriz
                 priority_data = []
                 for opp in all_opportunities:
                     priority_data.append({
@@ -1729,29 +1562,20 @@ domain|another-site.com""",
                 
                 priority_df = pd.DataFrame(priority_data)
                 
-                # Mostrar tabla interactiva
                 st.dataframe(
                     priority_df,
                     use_container_width=True,
                     height=400,
                     column_config={
-                        "Volumen": st.column_config.NumberColumn(
-                            "Volumen",
-                            format="%d",
-                        ),
-                        "Keywords": st.column_config.NumberColumn(
-                            "Keywords",
-                            format="%d",
-                        ),
+                        "Volumen": st.column_config.NumberColumn("Volumen", format="%d"),
+                        "Keywords": st.column_config.NumberColumn("Keywords", format="%d"),
                     }
                 )
                 
-                # Botón de exportación rápida
                 st.divider()
                 col1, col2 = st.columns([3, 1])
                 
                 with col2:
-                    # Exportar solo oportunidades a CSV
                     csv_opps = priority_df.to_csv(index=False)
                     st.download_button(
                         "📥 Exportar Oportunidades",
@@ -1760,57 +1584,13 @@ domain|another-site.com""",
                         mime="text/csv",
                         type="primary"
                     )
-            
-            # Recomendaciones estratégicas
-            st.divider()
-            st.subheader("🎯 Recomendaciones Estratégicas")
-            
-            recommendations = []
-            
-            if gaps_count > 0:
-                recommendations.append({
-                    'titulo': 'Aprovechar Gaps de Contenido',
-                    'descripcion': f'Se identificaron {gaps_count} gaps con oportunidades de bajo competencia. Prioriza estos para quick wins.',
-                    'prioridad': 'Alta',
-                    'timeframe': 'Inmediato (0-2 semanas)'
-                })
-            
-            if trends_count > 0:
-                recommendations.append({
-                    'titulo': 'Capitalizar Tendencias Emergentes',
-                    'descripcion': f'{trends_count} tendencias en crecimiento detectadas. Actúa rápido para posicionarte como líder.',
-                    'prioridad': 'Alta',
-                    'timeframe': 'Corto plazo (2-4 semanas)'
-                })
-            
-            if tier1_count > 0:
-                recommendations.append({
-                    'titulo': 'Desarrollar Topics Tier 1',
-                    'descripcion': f'{tier1_count} topics prioritarios identificados. Alto volumen y relevancia estratégica.',
-                    'prioridad': 'Media-Alta',
-                    'timeframe': 'Medio plazo (1-3 meses)'
-                })
-            
-            # Mostrar recomendaciones
-            for rec in recommendations:
-                with st.container():
-                    st.markdown(f"### {rec['titulo']}")
-                    st.write(rec['descripcion'])
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.markdown(f"**Prioridad:** {rec['prioridad']}")
-                    with col2:
-                        st.markdown(f"**Timeline:** {rec['timeframe']}")
-                    
-                    st.divider()
     
-    # TAB 6: Exportar (MOVIDO DE TAB 5)
+    # TAB 6: Exportar
     with tab6:
         st.header("Exportar Resultados")
         
         if st.session_state.keyword_universe is None:
-            st.info("🧠 Primero realiza el análisis con Claude")
+            st.info("🧠 Primero realiza el análisis con IA")
             return
         
         col1, col2 = st.columns(2)
@@ -1849,7 +1629,7 @@ domain|another-site.com""",
                                 file_name=f"keyword_universe_{datetime.now().strftime('%Y%m%d')}.csv",
                                 mime="text/csv"
                             )
-                        else:  # JSON
+                        else:
                             import json
                             json_data = json.dumps(st.session_state.keyword_universe, indent=2)
                             st.download_button(
@@ -1882,7 +1662,6 @@ domain|another-site.com""",
                 for tier, count in tier_dist.items():
                     st.text(f"Tier {tier}: {count} topics")
         
-        # EXPORTAR ARQUITECTURA (NUEVO)
         if st.session_state.architecture:
             st.divider()
             st.subheader("🏗️ Exportar Arquitectura Web")
@@ -1905,17 +1684,14 @@ domain|another-site.com""",
                             mime="application/json"
                         )
                     elif arch_format == "Excel":
-                        # Crear Excel con arquitectura
                         output = BytesIO()
                         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                            # Resumen
                             summary_df = pd.DataFrame({
                                 'Sección': ['Resumen'],
                                 'Contenido': [st.session_state.architecture.get('overview', 'N/A')]
                             })
                             summary_df.to_excel(writer, sheet_name='Resumen', index=False)
                             
-                            # Estructura si existe
                             if 'site_structure' in st.session_state.architecture:
                                 if 'main_sections' in st.session_state.architecture['site_structure']:
                                     sections_data = []
@@ -1938,7 +1714,7 @@ domain|another-site.com""",
                             file_name=f"web_architecture_{datetime.now().strftime('%Y%m%d')}.xlsx",
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                         )
-                    else:  # Mapa del Sitio
+                    else:
                         arch_service = ArchitectureService()
                         sitemap = arch_service.export_to_document(st.session_state.architecture)
                         st.download_button(
@@ -1951,6 +1727,7 @@ domain|another-site.com""",
                     st.success("✅ Arquitectura exportada")
                 except Exception as e:
                     st.error(f"Error: {str(e)}")
+
 
 if __name__ == "__main__":
     main()
