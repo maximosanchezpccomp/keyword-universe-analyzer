@@ -72,6 +72,87 @@ ANALYSIS_CONFIG = {
     "cache_ttl": int(os.getenv("CACHE_TTL", 3600))
 }
 
+# Configuración de caché
+CACHE_CONFIG = {
+    "enabled": os.getenv("ENABLE_CACHE", "true").lower() == "true",
+    "cache_dir": os.getenv("CACHE_DIR", "cache"),
+    "default_ttl_hours": int(os.getenv("CACHE_TTL_HOURS", "24")),
+    "max_size_mb": int(os.getenv("CACHE_MAX_SIZE_MB", "500")),
+    "auto_cleanup_days": int(os.getenv("CACHE_AUTO_CLEANUP_DAYS", "30"))
+}
+
+# Estimaciones de coste por modelo (costes octubre 2025)
+COST_ESTIMATES = {
+    "claude-sonnet-4-5-20250929": {
+        "input_per_1k": 0.003,   # $3 / 1M
+        "output_per_1k": 0.015,  # $15 / 1M
+        "avg_input_tokens": 10000,
+        "avg_output_tokens": 5000
+    },  # Anthropic mantiene $3/$15. :contentReference[oaicite:0]{index=0}
+
+    "claude-opus-4-20250514": {
+        "input_per_1k": 0.015,   # $15 / 1M
+        "output_per_1k": 0.075,  # $75 / 1M
+        "avg_input_tokens": 10000,
+        "avg_output_tokens": 5000
+    },  # Opus 4 sigue a $15/$75. :contentReference[oaicite:1]{index=1}
+
+    "gpt-4o": {
+        "input_per_1k": 0.005,   # $5 / 1M
+        "output_per_1k": 0.015,  # $15 / 1M
+        "avg_input_tokens": 10000,
+        "avg_output_tokens": 5000
+    },  # Precio base actual de 4o. :contentReference[oaicite:2]{index=2}
+
+    "gpt-4-turbo": {
+        "input_per_1k": 0.010,   # $10 / 1M
+        "output_per_1k": 0.030,  # $30 / 1M
+        "avg_input_tokens": 10000,
+        "avg_output_tokens": 5000
+    },  # Según la página de pricing. :contentReference[oaicite:3]{index=3}
+
+    "gpt-4": {
+        "input_per_1k": 0.030,   # $30 / 1M
+        "output_per_1k": 0.060,  # $60 / 1M
+        "avg_input_tokens": 10000,
+        "avg_output_tokens": 5000
+    }   # Según la página de pricing. :contentReference[oaicite:4]{index=4}
+}
+
+def estimate_analysis_cost(model: str, num_keywords: int = 1000) -> Dict[str, float]:
+    """
+    Estimar el coste de un análisis
+    
+    Args:
+        model: Nombre del modelo
+        num_keywords: Número de keywords a analizar
+        
+    Returns:
+        Dict con costo estimado y tokens
+    """
+    if model not in COST_ESTIMATES:
+        return {"cost": 0, "input_tokens": 0, "output_tokens": 0}
+    
+    config = COST_ESTIMATES[model]
+    
+    # Escalar tokens basado en número de keywords
+    scale_factor = num_keywords / 1000
+    input_tokens = int(config["avg_input_tokens"] * scale_factor)
+    output_tokens = int(config["avg_output_tokens"] * scale_factor)
+    
+    # Calcular costo
+    input_cost = (input_tokens / 1000) * config["input_per_1k"]
+    output_cost = (output_tokens / 1000) * config["output_per_1k"]
+    total_cost = input_cost + output_cost
+    
+    return {
+        "cost": round(total_cost, 4),
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "input_cost": round(input_cost, 4),
+        "output_cost": round(output_cost, 4)
+    }
+
 # Configuración de visualización - Colores corporativos PC Componentes
 VIZ_CONFIG = {
     "color_scheme": {
