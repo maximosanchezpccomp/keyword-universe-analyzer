@@ -1,348 +1,382 @@
 """
-Sistema de caché para análisis de keywords
-Permite guardar y recuperar análisis sin consumir créditos adicionales
+Sistema de caché inteligente para análisis de keywords
+
 """
 
-import json
-import os
-from pathlib import Path
-from datetime import datetime
-from typing import Dict, List, Optional, Any
 import hashlib
+import json
+import pickle
+from pathlib import Path
+from datetime import datetime, timedelta
+from typing import Dict, Any, Optional, List
+import pandas as pd
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class CacheManager:
-    """Gestor de caché para análisis de keywords"""
+    """Gestiona el sistema de caché para análisis de keywords"""
     
     def __init__(self, cache_dir: str = "cache"):
         self.cache_dir = Path(cache_dir)
-        self.cache_dir.mkdir(exist_ok=True)
         self.analyses_dir = self.cache_dir / "analyses"
-        self.analyses_dir.mkdir(exist_ok=True)
-        self.index_file = self.cache_dir / "index.json"
-        self._load_index()
-    
-    def _load_index(self):
-        """Carga el índice de análisis guardados"""
-        if self.index_file.exists():
-            with open(self.index_file, 'r', encoding='utf-8') as f:
-                self.index = json.load(f)
-        else:
-            self.index = []
-    
-    def _save_index(self):
-        """Guarda el índice actualizado"""
-        with open(self.index_file, 'w', encoding='utf-8') as f:
-            json.dump(self.index, f, indent=2, ensure_ascii=False)
-    
-    def _generate_id(self, data: Dict) -> str:
-        """Genera un ID único para el análisis"""
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        self.stats_file = self.cache_dir / "cache_stats.json"
         
-        # Crear hash del contenido para evitar duplicados exactos
-        content_str = json.dumps(data, sort_keys=True)
-        content_hash = hashlib.md5(content_str.encode()).hexdigest()[:8]
+        # Crear directorios
+        self.analyses_dir.mkdir(parents=True, exist_ok=True)
         
-        return f"{timestamp}_{content_hash}"
+        # Cargar o inicializar estadísticas
+        self.stats = self._load_stats()
+        
+        logger.info(f"CacheManager inicializado en: {self.cache_dir}")
     
-    def _generate_cache_key(self, data_hash: str, analysis_type: str, num_tiers: int) -> str:
+    def generate_hash(
+        self,
+        df: pd.DataFrame,
+        analysis_type: str,
+        num_tiers: int,
+        custom_instructions: str = "",
+        include_semantic: bool = True,
+        include_trends: bool = True,
+        include_gaps: bool = True
+    ) -> str:
         """
-        Genera una clave única para identificar un análisis específico
-        
-        Args:
-            data_hash: Hash de los datos
-            analysis_type: Tipo de análisis (Temática, Intención, Funnel)
-            num_tiers: Número de tiers
-        
-        Returns:
-            Clave única para el análisis
-        """
-        key_str = f"{data_hash}_{analysis_type}_{num_tiers}"
-        return hashlib.md5(key_str.encode()).hexdigest()[:16]
-    
-    def get_data_hash(self, df) -> str:
-        """
-        Genera un hash único de un DataFrame para identificarlo
+        Genera hash único basado en datos y parámetros del análisis
         
         Args:
             df: DataFrame con keywords
-        
-        Returns:
-            Hash único del dataset
-        """
-        if df is None or len(df) == 0:
-            return "empty"
-        
-        # Usar las primeras 100 keywords ordenadas + volumen total como identificador
-        sample = df.nlargest(100, 'volume')[['keyword', 'volume']].to_dict('records')
-        sample_str = json.dumps(sample, sort_keys=True)
-        return hashlib.md5(sample_str.encode()).hexdigest()[:16]
-    
-    def find_cached_analysis(
-        self, 
-        data_hash: str, 
-        analysis_type: str, 
-        num_tiers: int
-    ) -> Optional[str]:
-        """
-        Busca si existe un análisis en caché para estos parámetros
-        
-        Args:
-            data_hash: Hash del dataset
             analysis_type: Tipo de análisis
             num_tiers: Número de tiers
-        
+            custom_instructions: Instrucciones personalizadas
+            include_semantic: Si incluye análisis semántico
+            include_trends: Si incluye detección de tendencias
+            include_gaps: Si incluye detección de gaps
+            
         Returns:
-            ID del análisis si existe, None si no
+            Hash MD5 como string
         """
-        cache_key = self._generate_cache_key(data_hash, analysis_type, num_tiers)
+        # Componentes del hash
+        components = {
+            'keywords': sorted(df['keyword'].tolist()[:1000]),  # Top 1000 keywords ordenadas
+            'volumes': df.nlargest(1000, 'volume')['volume'].tolist(),
+            'analysis_type': analysis_type,
+            'num_tiers': num_tiers,
+            'custom_instructions': custom_instructions.strip(),
+            'semantic': include_semantic,
+            'trends': include_trends,
+            'gaps': include_gaps
+        }
         
-        # Buscar en el índice
-        for item in self.index:
-            item_metadata = item.get('metadata', {})
-            if item_metadata.get('cache_key') == cache_key:
-                return item['id']
+        # Convertir a string determinista
+        hash_string = json.dumps(components, sort_keys=True, ensure_ascii=False)
         
-        return None
+        # Generar hash MD5
+        hash_md5 = hashlib.md5(hash_string.encode('utf-8')).hexdigest()
+        
+        logger.debug(f"Hash generado: {hash_md5}")
+        return hash_md5
+    
+    def get_cached_analysis(
+        self,
+        cache_hash: str,
+        ttl_hours: int = 24
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Recupera un análisis del caché si existe y es válido
+        
+        Args:
+            cache_hash: Hash del análisis
+            ttl_hours: Tiempo de vida en horas (0 = sin expiración)
+            
+        Returns:
+            Resultado del análisis o None si no existe/expiró
+        """
+        result_file = self.analyses_dir / f"{cache_hash}.json"
+        meta_file = self.analyses_dir / f"{cache_hash}.meta.json"
+        
+        # Verificar si existe
+        if not result_file.exists() or not meta_file.exists():
+            logger.debug(f"Cache miss: {cache_hash}")
+            return None
+        
+        # Cargar metadata
+        try:
+            with open(meta_file, 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+        except Exception as e:
+            logger.error(f"Error leyendo metadata del caché: {e}")
+            return None
+        
+        # Verificar TTL
+        if ttl_hours > 0:
+            cached_time = datetime.fromisoformat(meta['timestamp'])
+            expiration_time = cached_time + timedelta(hours=ttl_hours)
+            
+            if datetime.now() > expiration_time:
+                logger.info(f"Cache expirado: {cache_hash} (creado: {cached_time})")
+                return None
+        
+        # Cargar resultado
+        try:
+            with open(result_file, 'r', encoding='utf-8') as f:
+                result = json.load(f)
+            
+            # Actualizar estadísticas
+            self.stats['hits'] += 1
+            self.stats['credits_saved'] += meta.get('estimated_credits', 0)
+            self.stats['cost_saved'] += meta.get('estimated_cost', 0)
+            self._save_stats()
+            
+            logger.info(f"Cache hit: {cache_hash} | Provider: {meta.get('provider', 'unknown')}")
+            
+            # Añadir metadata al resultado
+            result['_cache_metadata'] = {
+                'cached': True,
+                'timestamp': meta['timestamp'],
+                'provider': meta.get('provider'),
+                'model': meta.get('model'),
+                'age_hours': (datetime.now() - cached_time).total_seconds() / 3600
+            }
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error cargando resultado del caché: {e}")
+            return None
     
     def save_analysis(
         self,
-        keyword_universe: Dict[str, Any],
-        processed_data: Any,
-        metadata: Dict[str, Any]
-    ) -> str:
+        cache_hash: str,
+        result: Dict[str, Any],
+        provider: str,
+        model: str,
+        estimated_cost: float,
+        estimated_credits: float,
+        parameters: Dict[str, Any]
+    ) -> bool:
         """
-        Guarda un análisis completo en caché
+        Guarda un análisis en el caché
         
         Args:
-            keyword_universe: Resultado del análisis de IA
-            processed_data: DataFrame procesado (convertido a dict)
-            metadata: Información adicional (nombre, descripción, etc.)
-        
-        Returns:
-            ID del análisis guardado
-        """
-        
-        # Generar ID
-        analysis_id = self._generate_id(keyword_universe)
-        
-        # Preparar datos para guardar
-        analysis_data = {
-            'id': analysis_id,
-            'timestamp': datetime.now().isoformat(),
-            'keyword_universe': keyword_universe,
-            'metadata': metadata,
-            'stats': {
-                'total_topics': len(keyword_universe.get('topics', [])),
-                'total_keywords': metadata.get('total_keywords', 0),
-                'total_volume': metadata.get('total_volume', 0),
-                'provider': keyword_universe.get('provider', 'Unknown'),
-                'model': keyword_universe.get('model', 'Unknown')
-            }
-        }
-        
-        # Guardar archivo del análisis
-        analysis_file = self.analyses_dir / f"{analysis_id}.json"
-        with open(analysis_file, 'w', encoding='utf-8') as f:
-            json.dump(analysis_data, f, indent=2, ensure_ascii=False)
-        
-        # Guardar datos procesados por separado (puede ser grande)
-        if processed_data is not None:
-            data_file = self.analyses_dir / f"{analysis_id}_data.json"
-            # Convertir DataFrame a dict si es necesario
-            if hasattr(processed_data, 'to_dict'):
-                processed_data = processed_data.to_dict('records')
+            cache_hash: Hash del análisis
+            result: Resultado del análisis
+            provider: Proveedor de IA (Claude/OpenAI)
+            model: Modelo usado
+            estimated_cost: Costo estimado en $
+            estimated_credits: Créditos estimados usados
+            parameters: Parámetros del análisis
             
-            with open(data_file, 'w', encoding='utf-8') as f:
-                json.dump(processed_data, f, indent=2, ensure_ascii=False)
+        Returns:
+            True si se guardó exitosamente
+        """
+        result_file = self.analyses_dir / f"{cache_hash}.json"
+        meta_file = self.analyses_dir / f"{cache_hash}.meta.json"
         
-        # Actualizar índice
-        index_entry = {
-            'id': analysis_id,
-            'timestamp': analysis_data['timestamp'],
-            'name': metadata.get('name', 'Análisis sin nombre'),
-            'description': metadata.get('description', ''),
-            'stats': analysis_data['stats']
+        # Metadata
+        metadata = {
+            'timestamp': datetime.now().isoformat(),
+            'provider': provider,
+            'model': model,
+            'estimated_cost': estimated_cost,
+            'estimated_credits': estimated_credits,
+            'parameters': parameters,
+            'hash': cache_hash
         }
         
-        self.index.append(index_entry)
-        self._save_index()
-        
-        return analysis_id
+        try:
+            # Guardar resultado (sin metadata de caché)
+            result_clean = {k: v for k, v in result.items() if not k.startswith('_cache')}
+            with open(result_file, 'w', encoding='utf-8') as f:
+                json.dump(result_clean, f, ensure_ascii=False, indent=2)
+            
+            # Guardar metadata
+            with open(meta_file, 'w', encoding='utf-8') as f:
+                json.dump(metadata, f, ensure_ascii=False, indent=2)
+            
+            # Actualizar estadísticas
+            self.stats['total_analyses'] += 1
+            self.stats['total_cached'] += 1
+            self.stats['last_save'] = datetime.now().isoformat()
+            self._save_stats()
+            
+            logger.info(f"Análisis guardado en caché: {cache_hash}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error guardando en caché: {e}")
+            return False
     
-    def load_analysis(self, analysis_id: str) -> Optional[Dict[str, Any]]:
+    def clear_cache(self, older_than_hours: Optional[int] = None) -> int:
         """
-        Carga un análisis desde caché
+        Limpia el caché completamente o archivos antiguos
         
         Args:
-            analysis_id: ID del análisis a cargar
+            older_than_hours: Si se especifica, solo borra archivos más antiguos
+            
+        Returns:
+            Número de archivos eliminados
+        """
+        deleted = 0
+        
+        for meta_file in self.analyses_dir.glob("*.meta.json"):
+            should_delete = False
+            
+            if older_than_hours is None:
+                should_delete = True
+            else:
+                try:
+                    with open(meta_file, 'r', encoding='utf-8') as f:
+                        meta = json.load(f)
+                    
+                    cached_time = datetime.fromisoformat(meta['timestamp'])
+                    age_hours = (datetime.now() - cached_time).total_seconds() / 3600
+                    
+                    if age_hours > older_than_hours:
+                        should_delete = True
+                        
+                except Exception as e:
+                    logger.warning(f"Error leyendo {meta_file}: {e}")
+                    should_delete = True  # Eliminar archivos corruptos
+            
+            if should_delete:
+                cache_hash = meta_file.stem.replace('.meta', '')
+                result_file = self.analyses_dir / f"{cache_hash}.json"
+                
+                try:
+                    meta_file.unlink()
+                    if result_file.exists():
+                        result_file.unlink()
+                    deleted += 1
+                except Exception as e:
+                    logger.error(f"Error eliminando archivos de caché: {e}")
+        
+        logger.info(f"Caché limpiado: {deleted} análisis eliminados")
+        return deleted
+    
+    def get_cache_info(self) -> Dict[str, Any]:
+        """
+        Obtiene información sobre el estado del caché
         
         Returns:
-            Dict con el análisis completo o None si no existe
+            Diccionario con estadísticas del caché
         """
+        # Contar archivos
+        cached_files = list(self.analyses_dir.glob("*.json"))
+        cached_analyses = len([f for f in cached_files if not f.name.endswith('.meta.json')])
         
-        analysis_file = self.analyses_dir / f"{analysis_id}.json"
+        # Calcular tamaño
+        total_size = sum(f.stat().st_size for f in cached_files)
+        size_mb = total_size / (1024 * 1024)
         
-        if not analysis_file.exists():
-            return None
+        # Análisis más antiguo y más reciente
+        meta_files = list(self.analyses_dir.glob("*.meta.json"))
+        timestamps = []
         
-        with open(analysis_file, 'r', encoding='utf-8') as f:
-            analysis_data = json.load(f)
+        for meta_file in meta_files:
+            try:
+                with open(meta_file, 'r', encoding='utf-8') as f:
+                    meta = json.load(f)
+                    timestamps.append(datetime.fromisoformat(meta['timestamp']))
+            except:
+                continue
         
-        # Cargar datos procesados si existen
-        data_file = self.analyses_dir / f"{analysis_id}_data.json"
-        if data_file.exists():
-            with open(data_file, 'r', encoding='utf-8') as f:
-                processed_data = json.load(f)
-                analysis_data['processed_data'] = processed_data
+        oldest = min(timestamps) if timestamps else None
+        newest = max(timestamps) if timestamps else None
         
-        return analysis_data
+        return {
+            'total_analyses': self.stats.get('total_analyses', 0),
+            'cached_analyses': cached_analyses,
+            'cache_hits': self.stats.get('hits', 0),
+            'hit_rate': (self.stats.get('hits', 0) / max(self.stats.get('total_analyses', 1), 1)) * 100,
+            'credits_saved': self.stats.get('credits_saved', 0),
+            'cost_saved': self.stats.get('cost_saved', 0),
+            'size_mb': round(size_mb, 2),
+            'oldest_cache': oldest.isoformat() if oldest else None,
+            'newest_cache': newest.isoformat() if newest else None,
+            'cache_directory': str(self.cache_dir)
+        }
     
-    def list_analyses(self, sort_by: str = 'timestamp', reverse: bool = True) -> List[Dict]:
+    def list_cached_analyses(self, limit: int = 50) -> List[Dict[str, Any]]:
         """
-        Lista todos los análisis guardados
+        Lista los análisis en caché
         
         Args:
-            sort_by: Campo por el que ordenar ('timestamp', 'name', etc.)
-            reverse: Si ordenar de forma descendente
-        
+            limit: Número máximo de resultados
+            
         Returns:
             Lista de análisis con metadata
         """
+        analyses = []
         
-        # Recargar índice por si hubo cambios
-        self._load_index()
+        for meta_file in sorted(
+            self.analyses_dir.glob("*.meta.json"),
+            key=lambda f: f.stat().st_mtime,
+            reverse=True
+        )[:limit]:
+            try:
+                with open(meta_file, 'r', encoding='utf-8') as f:
+                    meta = json.load(f)
+                
+                # Calcular edad
+                cached_time = datetime.fromisoformat(meta['timestamp'])
+                age_hours = (datetime.now() - cached_time).total_seconds() / 3600
+                
+                analyses.append({
+                    'hash': meta['hash'],
+                    'timestamp': meta['timestamp'],
+                    'age_hours': round(age_hours, 1),
+                    'provider': meta.get('provider', 'unknown'),
+                    'model': meta.get('model', 'unknown'),
+                    'cost': meta.get('estimated_cost', 0),
+                    'parameters': meta.get('parameters', {})
+                })
+                
+            except Exception as e:
+                logger.warning(f"Error leyendo metadata: {e}")
+                continue
         
-        # Ordenar
-        sorted_index = sorted(
-            self.index,
-            key=lambda x: x.get(sort_by, ''),
-            reverse=reverse
-        )
-        
-        return sorted_index
+        return analyses
     
-    def delete_analysis(self, analysis_id: str) -> bool:
-        """
-        Elimina un análisis de la caché
+    def _load_stats(self) -> Dict[str, Any]:
+        """Carga estadísticas del caché"""
+        if self.stats_file.exists():
+            try:
+                with open(self.stats_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.warning(f"Error cargando estadísticas: {e}")
         
-        Args:
-            analysis_id: ID del análisis a eliminar
-        
-        Returns:
-            True si se eliminó correctamente
-        """
-        
-        analysis_file = self.analyses_dir / f"{analysis_id}.json"
-        data_file = self.analyses_dir / f"{analysis_id}_data.json"
-        
-        # Eliminar archivos
-        deleted = False
-        if analysis_file.exists():
-            analysis_file.unlink()
-            deleted = True
-        
-        if data_file.exists():
-            data_file.unlink()
-        
-        # Actualizar índice
-        self.index = [item for item in self.index if item['id'] != analysis_id]
-        self._save_index()
-        
-        return deleted
-    
-    def get_cache_size(self) -> Dict[str, Any]:
-        """
-        Obtiene información sobre el tamaño de la caché
-        
-        Returns:
-            Dict con estadísticas de la caché
-        """
-        
-        total_size = 0
-        file_count = 0
-        
-        for file in self.analyses_dir.glob('*.json'):
-            total_size += file.stat().st_size
-            file_count += 1
-        
+        # Estadísticas por defecto
         return {
-            'total_analyses': len(self.index),
-            'total_files': file_count,
-            'total_size_bytes': total_size,
-            'total_size_mb': round(total_size / (1024 * 1024), 2)
+            'total_analyses': 0,
+            'total_cached': 0,
+            'hits': 0,
+            'credits_saved': 0,
+            'cost_saved': 0,
+            'created': datetime.now().isoformat(),
+            'last_save': None
         }
     
-    def clear_cache(self) -> int:
-        """
-        Elimina toda la caché
-        
-        Returns:
-            Número de análisis eliminados
-        """
-        
-        count = 0
-        for file in self.analyses_dir.glob('*.json'):
-            file.unlink()
-            count += 1
-        
-        self.index = []
-        self._save_index()
-        
-        return count // 2  # Cada análisis tiene 2 archivos
+    def _save_stats(self):
+        """Guarda estadísticas del caché"""
+        try:
+            with open(self.stats_file, 'w', encoding='utf-8') as f:
+                json.dump(self.stats, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.error(f"Error guardando estadísticas: {e}")
+
+
+# Instancia global del cache manager
+_cache_manager = None
+
+def get_cache_manager() -> CacheManager:
+    """Obtiene la instancia global del cache manager"""
+    global _cache_manager
     
-    def search_analyses(self, query: str) -> List[Dict]:
-        """
-        Busca análisis por nombre o descripción
-        
-        Args:
-            query: Texto a buscar
-        
-        Returns:
-            Lista de análisis que coinciden
-        """
-        
-        query_lower = query.lower()
-        
-        results = [
-            item for item in self.index
-            if query_lower in item.get('name', '').lower()
-            or query_lower in item.get('description', '').lower()
-        ]
-        
-        return results
+    if _cache_manager is None:
+        from config import CACHE_CONFIG
+        cache_dir = CACHE_CONFIG.get('cache_dir', 'cache')
+        _cache_manager = CacheManager(cache_dir)
     
-    def get_analysis_stats(self) -> Dict[str, Any]:
-        """
-        Obtiene estadísticas agregadas de todos los análisis
-        
-        Returns:
-            Dict con estadísticas globales
-        """
-        
-        if not self.index:
-            return {
-                'total_analyses': 0,
-                'total_keywords_analyzed': 0,
-                'total_topics_created': 0,
-                'providers_used': [],
-                'date_range': None
-            }
-        
-        total_keywords = sum(item['stats'].get('total_keywords', 0) for item in self.index)
-        total_topics = sum(item['stats'].get('total_topics', 0) for item in self.index)
-        
-        providers = list(set(item['stats'].get('provider', 'Unknown') for item in self.index))
-        
-        timestamps = [item['timestamp'] for item in self.index]
-        date_range = {
-            'oldest': min(timestamps),
-            'newest': max(timestamps)
-        }
-        
-        return {
-            'total_analyses': len(self.index),
-            'total_keywords_analyzed': total_keywords,
-            'total_topics_created': total_topics,
-            'providers_used': providers,
-            'date_range': date_range
-        }
+    return _cache_manager
