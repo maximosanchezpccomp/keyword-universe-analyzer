@@ -15,7 +15,7 @@ import openpyxl
 sys.path.append(str(Path(__file__).parent.parent))
 
 from app.services.anthropic_service import AnthropicService
-from app.services.semrush_service import SemrushService
+from app.services.semrush_service import SemrushServiceOptimized as SemrushService
 from app.services.architecture_service import ArchitectureService 
 from app.components.data_processor import DataProcessor
 from app.components.visualizer import KeywordVisualizer
