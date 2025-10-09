@@ -78,3 +78,7 @@ Thumbs.db
 # Caché de análisis (opcional - comentar si quieres commitear la caché)
 cache/
 !cache/.gitkeep
+
+# Caché de Semrush optimizado 
+data/cache/*
+!data/cache/.gitkeep
