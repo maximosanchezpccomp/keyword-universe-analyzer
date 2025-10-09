@@ -484,15 +484,27 @@ Parámetros: {analysis['parameters'].get('analysis_type', 'N/A')} | Tiers: {anal
             st.markdown("### Gestión de Análisis")
             
             cache_manager = CacheManager()
-            cache_stats = cache_manager.get_cache_size()
+            
+            # CORRECCIÓN: Obtener estadísticas directamente
+            analyses = cache_manager.list_analyses()
+            total_analyses = len(analyses)
+            
+            # Calcular tamaño total (estimado en MB)
+            try:
+                cache_dir = Path(cache_manager.cache_dir)
+                if cache_dir.exists():
+                    total_size_bytes = sum(f.stat().st_size for f in cache_dir.glob('*.json') if f.is_file())
+                    total_size_mb = round(total_size_bytes / (1024 * 1024), 2)
+                else:
+                    total_size_mb = 0
+            except Exception:
+                total_size_mb = 0
             
             col_cache1, col_cache2 = st.columns(2)
             with col_cache1:
-                st.metric("Análisis guardados", cache_stats['total_analyses'])
+                st.metric("Análisis guardados", total_analyses)
             with col_cache2:
-                st.metric("Tamaño", f"{cache_stats['total_size_mb']} MB")
-            
-            analyses = cache_manager.list_analyses()
+                st.metric("Tamaño", f"{total_size_mb} MB")
             
             if analyses:
                 st.markdown("#### Cargar Análisis Anterior")
