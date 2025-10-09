@@ -22,6 +22,8 @@ from app.components.visualizer import KeywordVisualizer
 from app.utils.helpers import export_to_excel, calculate_metrics, format_number
 from app.utils.cache_manager import CacheManager
 from app.utils.helpers import safe_preview_dataframe
+from app.utils.cache_manager import get_cache_manager
+from config import CACHE_CONFIG, estimate_analysis_cost
 
 # Importar configuración del logo
 try:
@@ -365,7 +367,7 @@ def main():
             semrush_key = st.text_input("Semrush API Key", type="password",
                                        help="Tu API key de Semrush (opcional)")
         
-        # Configuración del análisis - CORREGIDO: SOLO UN BLOQUE
+        # Configuración del análisis 
         with st.expander("🎯 Parámetros de Análisis"):
             max_keywords = st.slider("Máximo de keywords por competidor", 
                                     100, 5000, 1000, 100)
@@ -404,6 +406,102 @@ def main():
                                                 "gpt-4-turbo"])
                 # model_choice no se usa en modo "Ambos", pero definirlo para evitar errores
                 model_choice = claude_model
+
+    # Gestión de Caché
+    with st.expander("💾 Sistema de Caché", expanded=False):
+        st.markdown("**Sistema de caché inteligente**")
+        st.markdown("Ahorra costos reutilizando análisis previos")
+        
+        # Obtener cache manager
+        cache_manager = get_cache_manager()
+        
+        # Toggle para habilitar/deshabilitar
+        cache_enabled = st.checkbox(
+            "Habilitar caché",
+            value=CACHE_CONFIG.get('enabled', True),
+            help="Reutiliza análisis previos para ahorrar costos"
+        )
+        
+        # TTL configurable
+        ttl_hours = st.slider(
+            "Validez del caché (horas)",
+            min_value=1,
+            max_value=168,  # 1 semana
+            value=CACHE_CONFIG.get('default_ttl_hours', 24),
+            help="Tiempo que permanece válido un análisis en caché"
+        )
+        
+        st.divider()
+        
+        # Estadísticas del caché
+        cache_info = cache_manager.get_cache_info()
+        
+        st.markdown("**📊 Estadísticas**")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric(
+                "Análisis en caché",
+                f"{cache_info['cached_analyses']}"
+            )
+            st.metric(
+                "Hit rate",
+                f"{cache_info['hit_rate']:.1f}%",
+                help="% de análisis recuperados del caché"
+            )
+        
+        with col2:
+            st.metric(
+                "$ Ahorrado",
+                f"${cache_info['cost_saved']:.2f}",
+                help="Costos ahorrados usando caché"
+            )
+            st.metric(
+                "Tamaño",
+                f"{cache_info['size_mb']} MB"
+            )
+        
+        st.divider()
+        
+        # Acciones de gestión
+        st.markdown("**🔧 Gestión**")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("🗑️ Limpiar caché antiguo", help="Elimina análisis con más de 7 días"):
+                deleted = cache_manager.clear_cache(older_than_hours=168)
+                st.success(f"✅ {deleted} análisis eliminados")
+                st.rerun()
+        
+        with col2:
+            if st.button("⚠️ Limpiar todo", help="Elimina TODO el caché"):
+                if st.session_state.get('confirm_clear_all', False):
+                    deleted = cache_manager.clear_cache()
+                    st.success(f"✅ {deleted} análisis eliminados")
+                    st.session_state.confirm_clear_all = False
+                    st.rerun()
+                else:
+                    st.session_state.confirm_clear_all = True
+                    st.warning("⚠️ Haz clic de nuevo para confirmar")
+        
+        # Listado de análisis recientes
+        with st.expander("📋 Análisis en caché (últimos 10)"):
+            recent_analyses = cache_manager.list_cached_analyses(limit=10)
+            
+            if recent_analyses:
+                for analysis in recent_analyses:
+                    age_text = f"{analysis['age_hours']:.1f}h" if analysis['age_hours'] < 24 else f"{analysis['age_hours']/24:.1f}d"
+                    
+                    st.text(f"""
+                    {analysis['provider']} ({analysis['model']})
+                    Antigüedad: {age_text} | Costo: ${analysis['cost']:.3f}
+                    Parámetros: {analysis['parameters'].get('analysis_type', 'N/A')} | Tiers: {analysis['parameters'].get('num_tiers', 'N/A')}
+                    """)
+                    st.caption(f"Hash: {analysis['hash'][:16]}...")
+                    st.divider()
+            else:
+                st.info("No hay análisis en caché todavía")
         
         # Sistema de Caché
         with st.expander("💾 Análisis Guardados", expanded=False):
@@ -881,105 +979,194 @@ domain|another-site.com""",
                     force_new = st.checkbox("Forzar nuevo análisis", value=False)
             else:
                 force_new = True  # No hay caché, siempre nuevo
+
+            # Estimación de costes
+            st.divider()
+            st.subheader("💰 Estimación de Costos")
+            
+            if ai_provider == "Claude (Anthropic)":
+                cost_est = estimate_analysis_cost(model_choice, len(df))
+                provider_name = "Claude"
+                model_name = model_choice
+            elif ai_provider == "OpenAI":
+                cost_est = estimate_analysis_cost(model_choice, len(df))
+                provider_name = "OpenAI"
+                model_name = model_choice
+            else:  # Ambos
+                cost_est_claude = estimate_analysis_cost(claude_model, len(df))
+                cost_est_openai = estimate_analysis_cost(openai_model, len(df))
+                cost_est = {
+                    'cost': cost_est_claude['cost'] + cost_est_openai['cost'],
+                    'input_tokens': cost_est_claude['input_tokens'] + cost_est_openai['input_tokens'],
+                    'output_tokens': cost_est_claude['output_tokens'] + cost_est_openai['output_tokens']
+                }
+                provider_name = "Ambos"
+                model_name = f"{claude_model} + {openai_model}"
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Costo estimado", f"${cost_est['cost']:.4f}")
+            with col2:
+                st.metric("Tokens (input)", f"{cost_est['input_tokens']:,}")
+            with col3:
+                st.metric("Tokens (output)", f"{cost_est['output_tokens']:,}")
+            
+            # Verificar si existe en caché
+            if cache_enabled:
+                cache_manager = get_cache_manager()
+                test_hash = cache_manager.generate_hash(
+                    df=df,
+                    analysis_type=analysis_type,
+                    num_tiers=num_tiers,
+                    custom_instructions=custom_instructions,
+                    include_semantic=include_semantic,
+                    include_trends=include_trends,
+                    include_gaps=include_gaps
+                )
+                
+                cached_result = cache_manager.get_cached_analysis(test_hash, ttl_hours)
+                
+                if cached_result:
+                    st.success(f"""
+            ✅ **Análisis disponible en caché**
+            
+            Este análisis ya fue realizado anteriormente y está disponible en caché.
+            
+            - **Proveedor:** {cached_result.get('_cache_metadata', {}).get('provider', 'N/A')}
+            - **Antigüedad:** {cached_result.get('_cache_metadata', {}).get('age_hours', 0):.1f} horas
+            - **Ahorro:** ${cost_est['cost']:.4f}
+            
+            Al hacer clic en "Analizar", se recuperará del caché sin consumir créditos.
+                    """)
+                else:
+                    st.info(f"""
+            ℹ️ **Análisis nuevo**
+            
+            Este análisis no está en caché y consumirá:
+            - **${cost_est['cost']:.4f}** en créditos de API
+            - **{cost_est['input_tokens'] + cost_est['output_tokens']:,}** tokens
+            
+            Quedará guardado en caché para futuras consultas.
+                    """)
+            
+            st.divider()
             
             # Botón de análisis
-            if force_new or not cached_analysis_id:
-                if st.button("🚀 Analizar con IA", type="primary", use_container_width=True):
-                    with st.spinner(f"🧠 {ai_provider.split('(')[0].strip()} está analizando tu universo de keywords..."):
-                        try:
-                            if ai_provider == "Claude (Anthropic)":
-                                # Análisis con Claude
-                                anthropic_service = AnthropicService(anthropic_key, claude_model)
-                                
-                                prompt = anthropic_service.create_universe_prompt(
-                                    df,
-                                    analysis_type=analysis_type,
-                                    num_tiers=num_tiers,
-                                    custom_instructions=custom_instructions,
-                                    include_semantic=include_semantic,
-                                    include_trends=include_trends,
-                                    include_gaps=include_gaps
-                                )
-                                
-                                result = anthropic_service.analyze_keywords(prompt, df)
-                                result['provider'] = 'Claude'
-                                result['model'] = claude_model
-                                
-                            elif ai_provider == "OpenAI":
-                                # Análisis con OpenAI
-                                from app.services.openai_service import OpenAIService
-                                
-                                openai_service = OpenAIService(openai_key, openai_model)
-                                
-                                messages = openai_service.create_universe_prompt(
-                                    df,
-                                    analysis_type=analysis_type,
-                                    num_tiers=num_tiers,
-                                    custom_instructions=custom_instructions,
-                                    include_semantic=include_semantic,
-                                    include_trends=include_trends,
-                                    include_gaps=include_gaps
-                                )
-                                
-                                result = openai_service.analyze_keywords(messages, df)
-                                result['provider'] = 'OpenAI'
-                                result['model'] = openai_model
-                                
-                            else:  # Ambos (Validación Cruzada)
-                                from app.services.openai_service import OpenAIService
-                                
-                                # Análisis con Claude
-                                st.info("1️⃣ Analizando con Claude...")
-                                anthropic_service = AnthropicService(anthropic_key, claude_model)
-                                
-                                prompt_claude = anthropic_service.create_universe_prompt(
-                                    df,
-                                    analysis_type=analysis_type,
-                                    num_tiers=num_tiers,
-                                    custom_instructions=custom_instructions,
-                                    include_semantic=include_semantic,
-                                    include_trends=include_trends,
-                                    include_gaps=include_gaps
-                                )
-                                
-                                result_claude = anthropic_service.analyze_keywords(prompt_claude, df)
-                                
-                                # Análisis con OpenAI
-                                st.info("2️⃣ Analizando con OpenAI...")
-                                openai_service = OpenAIService(openai_key, openai_model)
-                                
-                                messages_openai = openai_service.create_universe_prompt(
-                                    df,
-                                    analysis_type=analysis_type,
-                                    num_tiers=num_tiers,
-                                    custom_instructions=custom_instructions,
-                                    include_semantic=include_semantic,
-                                    include_trends=include_trends,
-                                    include_gaps=include_gaps
-                                )
-                                
-                                result_openai = openai_service.analyze_keywords(messages_openai, df)
-                                
-                                # Validación cruzada
-                                st.info("3️⃣ Comparando resultados...")
-                                comparison = openai_service.compare_with_claude(result_claude, df)
-                                
-                                # Combinar resultados
-                                result = {
-                                    'summary': f"**Análisis de Claude:**\n{result_claude.get('summary', '')}\n\n**Análisis de OpenAI:**\n{result_openai.get('summary', '')}",
-                                    'topics': result_claude.get('topics', []),
-                                    'topics_openai': result_openai.get('topics', []),
-                                    'comparison': comparison,
-                                    'provider': 'Ambos',
-                                    'models': f"Claude: {claude_model} | OpenAI: {openai_model}"
-                                }
-                                
-                                if 'gaps' in result_claude:
-                                    result['gaps'] = result_claude['gaps']
-                                if 'trends' in result_claude:
-                                    result['trends'] = result_claude['trends']
+            if st.button("🚀 Analizar con IA", type="primary", use_container_width=True):
+                with st.spinner(f"🧠 {ai_provider.split('(')[0].strip()} está analizando tu universo de keywords..."):
+                    try:
+                        # Parámetros del análisis para el caché
+                        analysis_params = {
+                            'analysis_type': analysis_type,
+                            'num_tiers': num_tiers,
+                            'custom_instructions': custom_instructions,
+                            'include_semantic': include_semantic,
+                            'include_trends': include_trends,
+                            'include_gaps': include_gaps
+                        }
+                        
+                        if ai_provider == "Claude (Anthropic)":
+                            # Análisis con Claude
+                            anthropic_service = AnthropicService(anthropic_key, model_choice)
                             
-                            st.session_state.keyword_universe = result
+                            prompt = anthropic_service.create_universe_prompt(
+                                df,
+                                **analysis_params
+                            )
+                            
+                            # Pasar use_cache y params
+                            result = anthropic_service.analyze_keywords(
+                                prompt,
+                                df,
+                                use_cache=cache_enabled,
+                                **analysis_params
+                            )
+                            result['provider'] = 'Claude'
+                            result['model'] = model_choice
+                            
+                        elif ai_provider == "OpenAI":
+                            # Análisis con OpenAI
+                            from app.services.openai_service import OpenAIService
+                            
+                            openai_service = OpenAIService(openai_key, model_choice)
+                            
+                            messages = openai_service.create_universe_prompt(
+                                df,
+                                **analysis_params
+                            )
+                            
+                            # Pasar use_cache y params
+                            result = openai_service.analyze_keywords(
+                                messages,
+                                df,
+                                use_cache=cache_enabled,
+                                **analysis_params
+                            )
+                            result['provider'] = 'OpenAI'
+                            result['model'] = model_choice
+                            
+                        else:  # Ambos (Validación Cruzada)
+                            from app.services.openai_service import OpenAIService
+                            
+                            # Análisis con Claude
+                            st.info("1️⃣ Analizando con Claude...")
+                            anthropic_service = AnthropicService(anthropic_key, claude_model)
+                            
+                            prompt_claude = anthropic_service.create_universe_prompt(df, **analysis_params)
+                            result_claude = anthropic_service.analyze_keywords(
+                                prompt_claude,
+                                df,
+                                use_cache=cache_enabled,
+                                **analysis_params
+                            )
+                            
+                            # Análisis con OpenAI
+                            st.info("2️⃣ Analizando con OpenAI...")
+                            openai_service = OpenAIService(openai_key, openai_model)
+                            
+                            messages_openai = openai_service.create_universe_prompt(df, **analysis_params)
+                            result_openai = openai_service.analyze_keywords(
+                                messages_openai,
+                                df,
+                                use_cache=cache_enabled,
+                                **analysis_params
+                            )
+                            
+                            # Validación cruzada
+                            st.info("3️⃣ Comparando resultados...")
+                            comparison = openai_service.compare_with_claude(result_claude, df)
+                            
+                            # Combinar resultados
+                            result = {
+                                'summary': f"**Análisis de Claude:**\n{result_claude.get('summary', '')}\n\n**Análisis de OpenAI:**\n{result_openai.get('summary', '')}",
+                                'topics': result_claude.get('topics', []),
+                                'topics_openai': result_openai.get('topics', []),
+                                'comparison': comparison,
+                                'provider': 'Ambos',
+                                'models': f"Claude: {claude_model} | OpenAI: {openai_model}"
+                            }
+                            
+                            if 'gaps' in result_claude:
+                                result['gaps'] = result_claude['gaps']
+                            if 'trends' in result_claude:
+                                result['trends'] = result_claude['trends']
+                        
+                        st.session_state.keyword_universe = result
+                        
+                        # Mostrar si vino del caché
+                        if result.get('_cache_metadata', {}).get('cached', False):
+                            st.success("✅ ¡Análisis completado! (Recuperado del caché)")
+                            st.info(f"💰 Has ahorrado ${cost_est['cost']:.4f} usando el caché")
+                        else:
+                            st.success("✅ ¡Análisis completado y guardado en caché!")
+                        
+                        st.balloons()
+                        
+                    except Exception as e:
+                        st.error(f"❌ Error en el análisis: {str(e)}")
+                        import traceback
+                        with st.expander("Ver detalles del error"):
+                            st.code(traceback.format_exc())
                             
                             # GUARDAR EN HISTORIAL DE ANÁLISIS (NUEVO)
                             if result not in st.session_state.analyses_history:
