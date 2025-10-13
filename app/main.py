@@ -331,6 +331,13 @@ def display_logo():
 
 
 def main():
+    # Mostrar errores de importación si los hay (AHORA sí podemos usar st.error)
+    if IMPORT_ERRORS:
+        st.error("⚠️ Algunos servicios no están disponibles:")
+        for service, error in IMPORT_ERRORS.items():
+            st.error(f"- {service}: {error}")
+        st.info("La aplicación funcionará con funcionalidad limitada.")
+
     # Header con logo
     col_logo, col_title = st.columns([1, 4])
     
