@@ -21,7 +21,7 @@ from app.components.visualizer import KeywordVisualizer
 from app.utils.helpers import export_to_excel, calculate_metrics, format_number
 from app.utils.cache_manager import CacheManager
 from app.utils.helpers import safe_preview_dataframe
-from app.utils.cache_manager import get_cache_manager
+#from app.utils.cache_manager import get_cache_manager
 from config import CACHE_CONFIG, estimate_analysis_cost
 
 # Importar configuración del logo
@@ -410,7 +410,7 @@ def main():
             st.markdown("**Sistema de caché inteligente**")
             st.markdown("Ahorra costos reutilizando análisis previos")
             
-            cache_manager = get_cache_manager()
+            cache_manager = CacheManager()
             
             cache_enabled = st.checkbox(
                 "Habilitar caché",
