@@ -92,9 +92,12 @@ class CacheManager:
             print(f"Error guardando en caché: {e}")
             return False
     
-    def list_analyses(self) -> List[Dict]:
+    def list_analyses(self, limit: Optional[int] = None) -> List[Dict]:
         """
         Lista todos los análisis cacheados
+        
+        Args:
+            limit: Número máximo de análisis a retornar (opcional)
         
         Returns:
             Lista de análisis con metadata
@@ -131,10 +134,26 @@ class CacheManager:
             # Ordenar por timestamp descendente (más recientes primero)
             analyses.sort(key=lambda x: x['timestamp'], reverse=True)
             
+            # Aplicar límite si se especificó
+            if limit is not None and limit > 0:
+                analyses = analyses[:limit]
+            
         except Exception as e:
             print(f"Error listando análisis: {e}")
         
         return analyses
+    
+    def list_cached_analyses(self, limit: int = 10) -> List[Dict]:
+        """
+        Lista análisis cacheados con límite (alias de list_analyses)
+        
+        Args:
+            limit: Número máximo de análisis a retornar
+            
+        Returns:
+            Lista de análisis con metadata
+        """
+        return self.list_analyses(limit=limit)
     
     def delete(self, key: str) -> bool:
         """
