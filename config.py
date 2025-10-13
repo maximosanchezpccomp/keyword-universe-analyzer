@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Dict, Any
 
 # Cargar variables de entorno
 try:
