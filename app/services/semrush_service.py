@@ -312,6 +312,7 @@ class SemrushServiceOptimized:
         domains: List[str], 
         limit: int = 5000,
         delay: float = 1.0
+        database: str = "us"
     ) -> pd.DataFrame:
         """
         Obtiene keywords de múltiples dominios (versión secuencial compatible)
@@ -333,7 +334,7 @@ class SemrushServiceOptimized:
         for domain in domains:
             try:
                 logger.info(f"🔍 Obteniendo keywords de {domain}...")
-                keywords = self.get_organic_keywords(domain, limit=limit)
+                keywords = self.get_organic_keywords(domain, limit=limit,database=database)
                 all_keywords.append(keywords)
                 logger.info(f"✓ {domain}: {len(keywords)} keywords")
                 
@@ -364,6 +365,7 @@ class SemrushServiceOptimized:
         domains: List[str], 
         limit: int = 5000,
         max_workers: int = 3
+        database: str = "us"
     ) -> pd.DataFrame:
         """
         Obtiene keywords de múltiples dominios en paralelo (respetando rate limits)
@@ -384,7 +386,7 @@ class SemrushServiceOptimized:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Submitir todos los dominios
             future_to_domain = {
-                executor.submit(self.get_organic_keywords, domain, limit): domain
+                executor.submit(self.get_organic_keywords, domain, limit, database=database): domain
                 for domain in domains
             }
             
