@@ -3,26 +3,36 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
-from typing import Dict, List, Any  
 import sys
 import os
 from pathlib import Path
-from io import BytesIO
-import openpyxl
 
 # Añadir el directorio raíz al path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from app.services.anthropic_service import AnthropicService
-from app.services.semrush_service import SemrushServiceOptimized as SemrushService
-from app.services.architecture_service import ArchitectureService 
+# Imports seguros de servicios
+try:
+    from app.services.anthropic_service import AnthropicService
+except ImportError as e:
+    st.error(f"Error importando AnthropicService: {e}")
+    AnthropicService = None
+
+try:
+    from app.services.semrush_service import SemrushService
+except ImportError as e:
+    st.warning(f"SemrushService no disponible: {e}")
+    SemrushService = None
+
+# OpenAI es opcional
+try:
+    from app.services.openai_service import OpenAIService
+except ImportError:
+    OpenAIService = None
+
+# Componentes
 from app.components.data_processor import DataProcessor
 from app.components.visualizer import KeywordVisualizer
-from app.utils.helpers import export_to_excel, calculate_metrics, format_number
-from app.utils.cache_manager import CacheManager
-from app.utils.helpers import safe_preview_dataframe
-#from app.utils.cache_manager import get_cache_manager
-from config import CACHE_CONFIG, estimate_analysis_cost
+from app.utils.helpers import export_to_excel, calculate_metrics
 
 # Importar configuración del logo
 try:
