@@ -330,6 +330,17 @@ def main():
     with col_title:
         st.markdown('<h1 class="main-header fade-in">🌌 Keyword Universe Analyzer</h1>', unsafe_allow_html=True)
         st.markdown('<p class="main-subtitle fade-in">Análisis SEO con IA - Powered by PC Componentes</p>', unsafe_allow_html=True)
+
+    # Inicializar cache manager
+    from app.utils.cache_manager import CacheManager
+    
+    if 'cache_manager' not in st.session_state:
+        st.session_state.cache_manager = CacheManager(
+            cache_dir="data/cache",
+            ttl_hours=24
+        )
+    
+    cache_manager = st.session_state.cache_manager
     
     # Sidebar
     with st.sidebar:
