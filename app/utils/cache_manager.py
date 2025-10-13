@@ -248,3 +248,52 @@ class CacheManager:
                 'total_size_mb': 0,
                 'cache_dir': str(self.cache_dir.absolute())
             }
+    
+    def get_cache_info(self) -> Dict:
+        """
+        Obtiene información resumida del caché para mostrar en UI
+        
+        Returns:
+            Diccionario con métricas del caché para la interfaz
+        """
+        stats = self.get_stats()
+        
+        # Calcular hit rate (análisis válidos vs total)
+        total = stats.get('total_analyses', 0)
+        valid = stats.get('valid_analyses', 0)
+        hit_rate = (valid / total * 100) if total > 0 else 0
+        
+        # Estimar costo ahorrado
+        # Asumiendo ~$0.20 por análisis promedio
+        cost_saved = valid * 0.20
+        
+        return {
+            'cached_analyses': valid,
+            'hit_rate': hit_rate,
+            'cost_saved': cost_saved,
+            'size_mb': stats.get('total_size_mb', 0),
+            'total_analyses': total,
+            'expired_analyses': stats.get('expired_analyses', 0)
+        }
+
+
+# Función helper para obtener instancia singleton (opcional)
+_cache_manager_instance = None
+
+def get_cache_manager(cache_dir: str = "data/cache", ttl_hours: int = 24) -> CacheManager:
+    """
+    Obtiene una instancia singleton del CacheManager
+    
+    Args:
+        cache_dir: Directorio del caché
+        ttl_hours: Tiempo de vida en horas
+        
+    Returns:
+        Instancia de CacheManager
+    """
+    global _cache_manager_instance
+    
+    if _cache_manager_instance is None:
+        _cache_manager_instance = CacheManager(cache_dir, ttl_hours)
+    
+    return _cache_manager_instance
