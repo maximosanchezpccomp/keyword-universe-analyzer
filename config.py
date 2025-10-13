@@ -1,10 +1,13 @@
 import os
-from dotenv import load_dotenv
 from pathlib import Path
-from typing import Dict, Any
 
 # Cargar variables de entorno
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # dotenv es opcional en producción (Streamlit Cloud usa secrets)
+    pass
 
 # Paths
 BASE_DIR = Path(__file__).parent
@@ -15,16 +18,19 @@ OUTPUT_DIR = BASE_DIR / "outputs"
 
 # Crear directorios si no existen
 for directory in [DATA_DIR, RAW_DATA_DIR, PROCESSED_DATA_DIR, OUTPUT_DIR]:
-    directory.mkdir(parents=True, exist_ok=True)
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        print(f"Warning: No se pudo crear directorio {directory}: {e}")
 
-# API Keys
+# API Keys - con fallback a None
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 SEMRUSH_API_KEY = os.getenv("SEMRUSH_API_KEY")
 
-# Logo configuration (usado en app/main.py)
-LOGO_URL = os.getenv("LOGO_URL", "https://cdn.pccomponentes.com/img/logos/logo-pccomponentes.svg")
-LOGO_BASE64 = os.getenv("LOGO_BASE64")  # Base64 embebido del logo (opcional)
+# Logo configuration (para evitar errores)
+LOGO_URL = None
+LOGO_BASE64 = None
 
 # Configuración de la aplicación
 APP_CONFIG = {
