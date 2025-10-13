@@ -772,7 +772,7 @@ Parámetros: {analysis['parameters'].get('analysis_type', 'N/A')} | Tiers: {anal
                                     semrush = SemrushService(semrush_key)
                                     
                                     all_data = semrush.batch_get_keywords(
-                                        targets=targets_list,
+                                        domains=targets_list,
                                         limit=semrush_limit,
                                         delay=1.0,
                                         database=semrush_database
