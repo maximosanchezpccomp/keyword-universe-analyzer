@@ -10,29 +10,44 @@ from pathlib import Path
 # Añadir el directorio raíz al path
 sys.path.append(str(Path(__file__).parent.parent))
 
-# Imports seguros de servicios
+# Variables globales para rastrear errores de importación
+IMPORT_ERRORS = {}
+
+# Imports con manejo de errores
 try:
     from app.services.anthropic_service import AnthropicService
-except ImportError as e:
-    st.error(f"Error importando AnthropicService: {e}")
+except Exception as e:
+    IMPORT_ERRORS['Anthropic'] = str(e)
     AnthropicService = None
 
 try:
     from app.services.semrush_service import SemrushService
-except ImportError as e:
-    st.warning(f"SemrushService no disponible: {e}")
+except Exception as e:
+    IMPORT_ERRORS['Semrush'] = str(e)
     SemrushService = None
 
-# OpenAI es opcional
 try:
     from app.services.openai_service import OpenAIService
-except ImportError:
+except Exception as e:
+    IMPORT_ERRORS['OpenAI'] = str(e)
     OpenAIService = None
 
-# Componentes
+# Estos deberían funcionar siempre
 from app.components.data_processor import DataProcessor
 from app.components.visualizer import KeywordVisualizer
 from app.utils.helpers import export_to_excel, calculate_metrics
+
+# Logo (opcional)
+LOGO_URL = None
+LOGO_BASE64 = None
+
+# Configuración de la página (debe estar ANTES de cualquier st.*)
+st.set_page_config(
+    page_title="Keyword Universe Analyzer PcCom",
+    page_icon="🌌",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # Importar configuración del logo
 try:
